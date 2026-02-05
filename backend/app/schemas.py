@@ -16,3 +16,12 @@ class UserResponse(BaseModel): ##This schema defines what data the API sends bac
 
     class Config: ##It allows Pydantic (schemas) to read data from SQLAlchemy ORM objects.
         from_attributes = True
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
