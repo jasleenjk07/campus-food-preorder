@@ -3,8 +3,8 @@
 from sqlalchemy import create_engine #Creates the connection between the python and the database
 from sqlalchemy.ext.declarative import declarative_base #Used to define database tables using Python classes
 from sqlalchemy.orm import sessionmaker #Used to talk to the database (read/write data)
-from sqlalchemy.orm import Session
-from fastapi import Depends
+from sqlalchemy.orm import Session #Used for querying and saving data
+from fastapi import Depends #Lets FastAPI automatically provide things to your API functions
 
 #SQLite Database (for development)
 DATABASE_URL = "sqlite:///./campus_food.db" #Database URL tells where the database is located and what type of database it is (sqlite, postgresql, etc.)
@@ -21,9 +21,9 @@ SessionLocal = sessionmaker( #A session is how your app reads data, writes data,
 
 Base = declarative_base() #Parent class for all the models
 
-def get_db():
-    db = SessionLocal()
+def get_db(): #This tells how each API request safely talk to the database
+    db = SessionLocal() #A new database session is created for each request
     try:
-        yield db
+        yield db #give DB session to API
     finally:
-        db.close()
+        db.close() #clean up
