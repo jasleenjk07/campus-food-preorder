@@ -1,0 +1,154 @@
+### Campus Food Pre-Order API - HTTP Test File
+### Use with VS Code REST Client extension or JetBrains HTTP Client
+### Replace {{token}} with your JWT after login; use different tokens for USER, VENDOR, ADMIN as needed
+
+@baseUrl = http://localhost:8000
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjo0LCJyb2xlIjoiVVNFUiIsImV4cCI6MTc3MDc0NTYzNX0.aea-0PtVoJGLpAaeeUH5EjSEVmchX_7tQfnboR3E7PA
+
+###############################################################################
+# Health Check
+###############################################################################
+
+### GET / - Health check
+GET {{baseUrl}}/
+
+###############################################################################
+# Auth
+###############################################################################
+
+### POST /auth/register - Register new user
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Test User",
+  "email": "user@example.com",
+  "password": "password123",
+  "university_id": 1
+}
+
+### POST /auth/create-user - Create user (ADMIN only)
+POST {{baseUrl}}/auth/create-user
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "New Vendor",
+  "email": "vendor@example.com",
+  "password": "password123",
+  "university_id": 1,
+  "role": "VENDOR"
+}
+
+### POST /auth/login - Login (form-urlencoded)
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+username=user@example.com&password=password123
+
+###############################################################################
+# Users
+###############################################################################
+
+### GET /users/me - Get current user profile
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{token}}
+
+###############################################################################
+# Admin
+###############################################################################
+
+### GET /admin/users - List all users (ADMIN only)
+GET {{baseUrl}}/admin/users
+Authorization: Bearer {{token}}
+
+### GET /admin/dashboard - Admin dashboard (ADMIN only)
+GET {{baseUrl}}/admin/dashboard
+Authorization: Bearer {{token}}
+
+### POST /admin/menu - Add menu item placeholder (VENDOR only)
+POST {{baseUrl}}/admin/menu
+Authorization: Bearer {{token}}
+
+### POST /admin/orders - Place order placeholder (USER only)
+POST {{baseUrl}}/admin/orders
+Authorization: Bearer {{token}}
+
+###############################################################################
+# Menu
+###############################################################################
+
+### GET /menu - List available food items (no auth)
+GET {{baseUrl}}/menu
+
+### POST /menu - Add food item (ADMIN or VENDOR)
+POST {{baseUrl}}/menu
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Margherita Pizza",
+  "description": "Classic tomato and mozzarella",
+  "price": 12.99
+}
+
+###############################################################################
+# Orders
+###############################################################################
+
+### GET /orders/ping - Orders health check (no auth)
+GET {{baseUrl}}/orders/ping
+
+### POST /orders - Place order (USER)
+POST {{baseUrl}}/orders
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "food_id": 1,
+  "quantity": 2
+}
+
+### GET /orders/me - My orders (USER)
+GET {{baseUrl}}/orders/me
+Authorization: Bearer {{token}}
+
+### GET /orders/vendor - Vendor's orders (VENDOR)
+GET {{baseUrl}}/orders/vendor
+Authorization: Bearer {{token}}
+
+### GET /orders/admin - All orders (ADMIN)
+GET {{baseUrl}}/orders/admin
+Authorization: Bearer {{token}}
+
+### POST /orders/1/pay - Pay for order (USER) - UPI_INAPP (default)
+POST {{baseUrl}}/orders/1/pay?payment_method=UPI_INAPP
+Authorization: Bearer {{token}}
+
+### POST /orders/1/pay - Pay with CARD
+POST {{baseUrl}}/orders/1/pay?payment_method=CARD
+Authorization: Bearer {{token}}
+
+### POST /orders/1/pay - Pay with WALLET
+POST {{baseUrl}}/orders/1/pay?payment_method=WALLET
+Authorization: Bearer {{token}}
+
+### POST /orders/1/pay - Pay with COD (Cash on Delivery)
+POST {{baseUrl}}/orders/1/pay?payment_method=COD
+Authorization: Bearer {{token}}
+
+### POST /orders/1/pay - Pay with PAY_LATER
+POST {{baseUrl}}/orders/1/pay?payment_method=PAY_LATER
+Authorization: Bearer {{token}}
+
+### PUT /orders/1/prepare - Mark order preparing (VENDOR)
+PUT {{baseUrl}}/orders/1/prepare
+Authorization: Bearer {{token}}
+
+### PUT /orders/1/deliver - Mark order delivered (ADMIN)
+PUT {{baseUrl}}/orders/1/deliver
+Authorization: Bearer {{token}}
+
+### PUT /orders/1/cancel - Cancel order (USER or ADMIN)
+PUT {{baseUrl}}/orders/1/cancel
+Authorization: Bearer {{token}}
