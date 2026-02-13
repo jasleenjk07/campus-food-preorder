@@ -11,6 +11,8 @@ from app.auth.roles import require_role
 from app.utils import create_notification
 
 from app.core.rate_limiter import limiter
+from app.core.order_state import validate_transition
+
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
 @router.post("/", response_model=OrderResponse)
@@ -127,7 +129,7 @@ def prepare_order(
     if not order.is_paid:
         raise HTTPException(status_code=400, detail="Order must be paid before preparation")
 
-    order.status = "PREPARING" #Moves order from PLACED → PREPARING
+    validate_transition(order.status, "PREPARING") #Moves order from PLACED → PREPARING
     db.commit()
     db.refresh(order)
 
@@ -157,11 +159,7 @@ def deliver_order(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    if order.status != "PREPARING":
-        raise HTTPException(
-            status_code = 400,
-            detail="Order must be PREPARING before delivery"
-        )
+    validate_transition(order.status, "DELIVERED")
     
     order.status = "DELIVERED" #Marks the order as completed
     # Auto-deduct for Pay Later
@@ -204,7 +202,8 @@ def cancel_order(
             )
     
     # ADMIN can cancel anytime
-    order.status = "CANCELLED"
+    validate_transition(order.status, "CANCELLED")
+
     db.commit()
     db.refresh(order)
 
@@ -241,11 +240,7 @@ def pay_for_order(
     if order.is_paid:
         raise HTTPException(status_code=400, detail="Order already paid")
 
-    if order.status not in {"PLACED"}:
-        raise HTTPException(
-            status_code=400,
-            detail="Payment not allowed at this stage"
-        )
+    validate_transition(order.status, "PAID")
 
     existing_order = db.query(models.Order).filter(
         models.Order.idempotency_key == idempotency_key
