@@ -1,5 +1,7 @@
 import random
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, Header
+
 from sqlalchemy.orm import Session #Session represents a database connection
 
 from app.database import get_db #get_db provides a database session per request
@@ -224,6 +226,7 @@ def cancel_order(
 def pay_for_order(
     order_id: int,
     payment_method: PaymentMethod = PaymentMethod.UPI_INAPP,
+    idempotency_key: str = Header(...), # Required header, Client must send it
     db: Session = Depends(get_db),
     current_user = Depends(require_role("USER"))
 ):
@@ -243,6 +246,13 @@ def pay_for_order(
             status_code=400,
             detail="Payment not allowed at this stage"
         )
+
+    existing_order = db.query(models.Order).filter(
+        models.Order.idempotency_key == idempotency_key
+    ).first()
+
+    if existing_order:
+        return existing_order
 
     # 💳 Payment simulation
     # 80% success, 20% failure
@@ -273,6 +283,8 @@ def pay_for_order(
         order.is_paid = False
     
     order.payment_method = payment_method.value
+    order.idempotency_key = idempotency_key
+    
     db.commit()
     db.refresh(order)
 
