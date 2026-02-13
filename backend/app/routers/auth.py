@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -10,6 +10,8 @@ from app.utils import verify_password
 from app.auth.jwt import create_access_token
 from app.schemas import LoginRequest, LoginResponse
 from app.auth.roles import require_role
+
+from app.core.rate_limiter import limiter
 
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -61,7 +63,9 @@ def create_user_by_admin(
     return new_user
     
 @router.post("/login", response_model=LoginResponse)
+@limiter.limit("5/minute")
 def login_user(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
