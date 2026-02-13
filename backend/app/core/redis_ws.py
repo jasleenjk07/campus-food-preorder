@@ -45,3 +45,5 @@ class RedisConnectionManager: #WebSocket manager
                 if user_id in self.active_connections:
                     for ws in self.active_connections[user_id]:
                         await ws.send_text(data)
+
+manager = RedisConnectionManager()
