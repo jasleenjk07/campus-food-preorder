@@ -1,9 +1,7 @@
 from app.core.celery_app import celery_app
 from app.database import SessionLocal
 from app import models
-from app.core.redis_ws import RedisConnectionManager
-
-manager = RedisConnectionManager()
+import redis
 
 @celery_app.task
 def send_notification_task(user_id: int, message: str):
@@ -18,8 +16,8 @@ def send_notification_task(user_id: int, message: str):
         db.commit()
 
         #Publish to Redis WebSocket
-        import asyncio
-        asyncio.run(manager.publish(user_id, message))
+        redis_client = redis.Redis(host="localhost", port=6379, db=0)
+        redis_client.publish(f"user:{user_id}", message)
 
     finally:
         db.close()
