@@ -21,10 +21,20 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 async def create_notification( #Creates and saves a notification in the database for a specific user.
-    db,
+    db: Session,
     user_id: int,
     message: str
 ):
+    # Check user preference
+    preference = db.query(models.NotificationPreference).filter(
+        models.NotificationPreference.user_id == user_id
+    ).first()
+
+    # If preferences exist and notifications disabled → stop
+    if preference and not preference.order_enabled:
+        return
+
+    # Create notification in DB
     notification = models.Notification(
         user_id=user_id,
         message=message,

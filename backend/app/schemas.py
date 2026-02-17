@@ -80,3 +80,10 @@ class NotificationResponse(BaseModel):
 
     class Config:
         form_attributes = True
+
+class PreferenceUpdateSchema(BaseModel):
+    order_enabled: bool
+    vendor_enabled: bool
+
+    class Config:
+        from_attributes = True

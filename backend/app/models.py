@@ -66,3 +66,12 @@ class Notification(Base):
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     user = relationship("User")
+
+class NotificationPreference(Base):
+    __tablename__ = "notification_preferences"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True)
+
+    order_enabled = Column(Boolean, default=True)
+    vendor_enabled = Column(Boolean, default=True)

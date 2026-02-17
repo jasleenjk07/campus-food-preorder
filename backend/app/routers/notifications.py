@@ -122,6 +122,27 @@ def get_unread_count(
         "unread_count": count
     }
 
+@router.put("/preferences")
+def update_preferences(
+    prefs: PreferenceUpdateSchema,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role("USER", "VENDOR", "ADMIN"))
+):
+    preference = db.query(models.NotificationPreference).filter(
+        models.NotificationPreference.user_id == current_user.id
+    ).first()
+
+    if not preference:
+        preference = models.NotificationPreference(user_id=current_user.id)
+        db.add(preference)
+
+    preference.order_enabled = prefs.order_enabled
+    preference.vendor_enabled = prefs.vendor_enabled
+
+    db.commit()
+
+    return {"message": "Preferences updated"}
+
 ## FOR TESTING PURPOSES ONLY
 # @router.get("/test")
 # async def test_notification(
