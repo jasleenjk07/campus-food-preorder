@@ -122,17 +122,18 @@ def get_unread_count(
         "unread_count": count
     }
 
-@router.get("/test")
-async def test_notification(
-    db: Session = Depends(get_db),
-    current_user = Depends(require_role("USER", "ADMIN", "VENDOR"))
-):
-    await manager.publish(
-        current_user.id,
-        {
-            "type": "unread_count_update",
-            "unread_count": 999
-        }
-    )
+## FOR TESTING PURPOSES ONLY
+# @router.get("/test")
+# async def test_notification(
+#     db: Session = Depends(get_db),
+#     current_user = Depends(require_role("USER", "ADMIN", "VENDOR"))
+# ):
+#     await manager.publish(
+#         current_user.id,
+#         {
+#             "type": "unread_count_update",
+#             "unread_count": 999
+#         }
+#     )
 
-    return {"message": "Test sent"}
+#     return {"message": "Test sent"}
