@@ -7,7 +7,7 @@ from app import models
 from app.auth.roles import require_role
 from app.auth.roles import require_role
 
-router = APIRouter(prefix="/admin", tags=["Admin"])
+router = APIRouter(tags=["Admin"])
 
 @router.get("/users")
 def get_all_users(

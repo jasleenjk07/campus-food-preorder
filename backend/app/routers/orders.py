@@ -13,11 +13,11 @@ from app.utils import create_notification
 from app.core.rate_limiter import limiter
 from app.core.order_state import validate_transition
 
-router = APIRouter(prefix="/orders", tags=["Orders"])
+router = APIRouter(tags=["Orders"])
 
 @router.post("/", response_model=OrderResponse)
 @limiter.limit("10/minute")
-def place_order(
+async def place_order(
     request: Request,
     order: OrderCreate,
     background_tasks: BackgroundTasks, #It allows you to run something after the response is returned.
@@ -58,19 +58,16 @@ def place_order(
     db.commit()
     db.refresh(new_order)
 
-
-    background_tasks.add_task(
-        create_notification,
+    await create_notification(
         db,
-        current_user.id,
-        f"Your order #{new_order.id} has been placed."
+        user_id=current_user.id,
+        message=f"Your order #{new_order.id} has been placed successfully"
     )
 
-    background_tasks.add_task(
-        create_notification,
+    await create_notification(
         db,
-        food.vendor_id,
-        f"New order #{new_order.id} received"
+        user_id=food.vendor_id,
+        message=f"New order #{new_order.id} received"
     )
 
     return new_order

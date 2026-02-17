@@ -1,9 +1,9 @@
 #This file replaces old in-memory WebSocket manager with a Redis-backed pub/sub system. Because: Old manager works only on 1 server instance, Redis manager ✅ works across multiple servers
-import redis.asyncio as redis
+import redis.asyncio as redis #Async Redis client
+import asyncio #async tasks
+import json #convert dict ↔ JSON string
 
-import asyncio
-
-from typing import Dict, List
+from typing import Dict, List #store connections per user
 
 from fastapi import WebSocket
 
@@ -12,7 +12,7 @@ from app.config import settings
 class RedisConnectionManager: #WebSocket manager
     def __init__(self):
         self.active_connections: Dict[int, List[WebSocket]] = {}
-        self.redis = redis.from_url(settings.REDIS_URL, decode_responses=True)
+        self.redis = redis.from_url(settings.REDIS_URL, decode_responses=True) #Connects to Redis.
         self.pubsub = self.redis.pubsub() #Creates Redis PubSub object. This is used to: Subscribe to channels, Listen for messages
 
 
@@ -29,24 +29,29 @@ class RedisConnectionManager: #WebSocket manager
         if not self.active_connections[user_id]:
             del self.active_connections[user_id]
     
-    async def publish(self, user_id: int, message: str): #publishes message to Redis channel
-        await self.redis.publish(f"user:{user_id}", message)
+    async def publish(self, user_id: int, message: dict): #publishes message to Redis channel
+        await self.redis.publish(
+            f"user:{user_id}", 
+            json.dumps(message)
+        )
 
     async def start_listener(self):
         await self.pubsub.psubscribe("user:*") #Subscribes to all channels starting with "user:"
 
         async for message in self.pubsub.listen(): #Listens for messages on all subscribed channels
             if message["type"] == "pmessage": #Handle messages
-                #Extract channel + data
                 channel = message["channel"]
                 data = message["data"]
 
-                #Extract user_id from channel name
+                # Extract user_id from channel name
                 user_id = int(channel.split(":")[1])
 
-                #Send message to all connected WebSockets for this user
+                # Parse JSON message
+                parsed_data = json.loads(data)
+
+                # Send message to all connected WebSockets for this user
                 if user_id in self.active_connections:
                     for ws in self.active_connections[user_id]:
-                        await ws.send_text(data)
+                        await ws.send_json(parsed_data)
 
 manager = RedisConnectionManager()

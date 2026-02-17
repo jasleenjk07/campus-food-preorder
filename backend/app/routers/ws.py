@@ -1,14 +1,12 @@
 #This file creates a secure WebSocket connection that: Accepts a JWT token, Verifies the token, Extracts the user_id, Connects only authenticated users, Sends them real-time notifications
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 
-from jose import JWTError, jwt
+from jose import JWTError, jwt #Used to decode and verify JWT
 
-from app.websocket_manager import ConnectionManager
 from app.auth.jwt import SECRET_KEY, ALGORITHM
-from app.core.ws_manager import manager
+from app.core.redis_ws import manager
 
 router = APIRouter() #registers WebSocket route
-manager = ConnectionManager() #manages all active connections
 
 @router.websocket("/ws") 
 async def websocket_endpoint( #When client connects like this: ws://localhost:8000/ws?token=YOUR_JWT

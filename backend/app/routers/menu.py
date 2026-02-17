@@ -10,7 +10,7 @@ from app.core.cache import get_cache, set_cache, delete_cache
 
 from fastapi import HTTPException
 
-router = APIRouter(prefix="/menu", tags=["Menu"])
+router = APIRouter(tags=["Menu"])
 
 @router.post("/", response_model=FoodResponse)
 def add_food(

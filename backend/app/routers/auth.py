@@ -13,7 +13,7 @@ from app.schemas import LoginRequest, LoginResponse
 from app.auth.roles import require_role
 from app.core.rate_limiter import limiter
 
-router = APIRouter(prefix="/auth", tags=["Auth"])
+router = APIRouter(tags=["Auth"])
 
 @router.post("/register", response_model=UserResponse)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
