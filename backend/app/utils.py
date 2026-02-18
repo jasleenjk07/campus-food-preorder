@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.core.redis_ws import manager
-from app.tasks.notifications import send_notification_task
+from app.tasks.notifications import send_notification_task, send_email_notification
 
 import asyncio
 
@@ -57,4 +57,10 @@ async def create_notification( #Creates and saves a notification in the database
             "type": "unread_count_update",
             "unread_count": unread_count
         }
+    )
+
+    send_email_notification.delay(
+        user_id,
+        "Cravix Notification",
+        message
     )

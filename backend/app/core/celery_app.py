@@ -2,13 +2,15 @@ from celery import Celery
 from app.config import settings
 
 celery_app = Celery(
-    "eatsy", #Celery app name
+    "cravix",
     broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL
+    backend=settings.REDIS_URL,
+    include=["app.tasks.notifications"],  # Explicitly include tasks
 )
 
-celery_app.autodiscover_tasks(["app.tasks"])
-
-celery_app.conf.task_routes = { #Any task inside app.tasks.notifications should go to the notifications queue.
-    "app.tasks.notifications.send_notification_task": {"queue": "notifications"}
+celery_app.conf.task_routes = {
+    "app.tasks.notifications.send_notification_task": {"queue": "notifications"},
+    "app.tasks.notifications.send_email_notification": {"queue": "notifications"},
 }
+
+celery = celery_app

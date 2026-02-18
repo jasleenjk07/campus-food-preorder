@@ -27,12 +27,12 @@ from sqlalchemy import text
 
 from pythonjsonlogger import jsonlogger
 
-app = FastAPI(title="Campus Food Pre-Order API") #Creates FastAPI application object
+app = FastAPI(title="Cravix API") #Creates FastAPI application object
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
 
 if settings.ENVIRONMENT == "production":
-    origins = ["https://eatsy.com"]
+    origins = ["https://cravix.com"]
 else:
     origins = ["*"] #Allow all origins.
 

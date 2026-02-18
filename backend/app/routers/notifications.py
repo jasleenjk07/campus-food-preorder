@@ -9,6 +9,7 @@ from app.database import get_db
 from app import models
 from app.auth.roles import require_role
 from app.core.redis_ws import manager
+from app.schemas import PreferenceUpdateSchema
 
 router = APIRouter(tags=["Notifications"])
 

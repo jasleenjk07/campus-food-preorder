@@ -9,7 +9,7 @@ from app import models
 from app.schemas import OrderCreate, OrderResponse, PaymentMethod
 from app.auth.roles import require_role
 from app.utils import create_notification
-
+from app.tasks.notifications import send_notification_task,send_email_notification
 from app.core.rate_limiter import limiter
 from app.core.order_state import validate_transition
 
@@ -58,16 +58,20 @@ async def place_order(
     db.commit()
     db.refresh(new_order)
 
-    await create_notification(
-        db,
-        user_id=current_user.id,
-        message=f"Your order #{new_order.id} has been placed successfully"
+    send_notification_task.delay(
+        current_user.id,
+        f"Your order #{new_order.id} has been placed successfully"
     )
 
-    await create_notification(
-        db,
-        user_id=food.vendor_id,
-        message=f"New order #{new_order.id} received"
+    send_notification_task.delay(
+        food.vendor_id,
+        f"New order #{new_order.id} received"
+    )
+
+    send_email_notification.delay(
+        current_user.id,
+        "Order Confirmation - Cravix",
+        f"Your order #{new_order.id} has been placed successfully"
     )
 
     return new_order
