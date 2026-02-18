@@ -5,13 +5,9 @@ from sqlalchemy.ext.declarative import declarative_base #Used to define database
 from sqlalchemy.orm import sessionmaker #Used to talk to the database (read/write data)
 from sqlalchemy.orm import Session #Used for querying and saving data
 from fastapi import Depends #Lets FastAPI automatically provide things to your API functions
+from app.config import settings
 
-#SQLite Database (for development)
-DATABASE_URL = "sqlite:///./campus_food.db" #Database URL tells where the database is located and what type of database it is (sqlite, postgresql, etc.)
-
-engine = create_engine( #Engine is the main connection controller knows how to connect and where to connect
-    DATABASE_URL, connect_args = {"check_same_thread": False}
-)
+engine = create_engine(settings.DATABASE_URL) #Engine is the main connection controller knows how to connect and where to connect
 
 SessionLocal = sessionmaker( #A session is how your app reads data, writes data, commits changes (Session = Conversation with the database)
     autocommit = False,

@@ -1,7 +1,7 @@
 import redis #Python client to connect to your Redis server.
 import json
 
-redis_client = redis.Redis(host="localhost", port=6379, db=1) #Connect to Redis running on: Host: localhost, Port: 6379, Database: 1
+redis_client = redis.Redis(host="redis", port=6379, db=1) #Connect to Redis running on: Host: localhost, Port: 6379, Database: 1
 
 CACHE_TTL = 300 #5 minutes: how long cached data lives. After 5 minutes: Redis automatically deletes the cached value.
 

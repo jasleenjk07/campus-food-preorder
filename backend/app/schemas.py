@@ -2,11 +2,17 @@ from datetime import datetime
 from pydantic import BaseModel, EmailStr #Pyndatic is used to validate the incoming data, automatically reject bad requests and convert data to python objects
 from enum import Enum
 
-class UserCreate(BaseModel): #
+class UserRole(str, Enum):
+    USER = "USER"
+    ADMIN = "ADMIN"
+    VENDOR = "VENDOR"
+
+class UserCreate(BaseModel): 
     name: str
     email: EmailStr
     password: str
     university_id: int | None = None
+    role: UserRole
     
 class UserResponse(BaseModel): ##This schema defines what data the API sends back after registration
     id: int
@@ -47,6 +53,7 @@ class OrderCreate(BaseModel): #This defines what data the client must send when 
 
 class OrderResponse(BaseModel): #This defines what the API sends back after. It is read-only for the client.
     id: int
+    user_id: int
     food_id: int
     quantity: int
     total_price: float
@@ -64,3 +71,19 @@ class PaymentMethod(str, Enum):
     WALLET = "WALLET"
     COD = "COD"
     PAY_LATER = "PAY_LATER"
+
+class NotificationResponse(BaseModel):
+    id: int
+    message: str
+    is_read: bool
+    created_at: datetime
+
+    class Config:
+        form_attributes = True
+
+class PreferenceUpdateSchema(BaseModel):
+    order_enabled: bool
+    vendor_enabled: bool
+
+    class Config:
+        from_attributes = True

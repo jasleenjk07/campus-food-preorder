@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends
+
 from sqlalchemy.orm import Session
+
 from app.database import get_db
 from app import models
 from app.auth.roles import require_role
 from app.auth.roles import require_role
 
-router = APIRouter(prefix="/admin", tags=["Admin"])
+router = APIRouter(tags=["Admin"])
 
 @router.get("/users")
 def get_all_users(

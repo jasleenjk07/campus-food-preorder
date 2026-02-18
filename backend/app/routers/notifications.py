@@ -1,14 +1,17 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException
+
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.database import get_db
 from app import models
 from app.auth.roles import require_role
+from app.core.redis_ws import manager
+from app.schemas import PreferenceUpdateSchema
 
-router = APIRouter(
-    prefix="/notifications",
-    tags=["Notifications"]
-)
+router = APIRouter(tags=["Notifications"])
 
 
 @router.get("/me")
@@ -39,6 +42,22 @@ def mark_notification_read(
 
     notification.is_read = True
     db.commit()
+
+    unread_count = db.query(func.count(models.Notification.id)).filter(
+        models.Notification.user_id == current_user.id,
+        models.Notification.is_read == False
+    ).scalar()
+
+    asyncio.create_task(
+        manager.publish(
+            current_user.id,
+            {
+                "type": "unread_count_update",
+                "unread_count": unread_count
+            }
+        )
+    )
+
     db.refresh(notification)
 
     return {"message": "Notification marked as read"}
@@ -65,6 +84,16 @@ def mark_all_notifications_read(
     # Save changes
     db.commit()
 
+    asyncio.create_task(
+        manager.publish(
+            current_user.id,
+            {
+                "type": "unread_count_update",
+                "unread_count": 0
+            }
+        )
+    )
+
     return {"message": "All notifications marked as read"}
 
 @router.get("/vendor")
@@ -78,3 +107,55 @@ def get_vendor_notifications(
         .order_by(models.Notification.created_at.desc()) # Sorts notifications by creation date in descending order.
         .all()
     )
+
+# Gets the number of unread notifications for the current user.
+@router.get("/unread-count")
+def get_unread_count(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role("USER", "ADMIN", "VENDOR"))
+):
+    count = db.query(func.count(models.Notification.id)).filter( #func.count() = SQL COUNT(*)
+        models.Notification.user_id == current_user.id,
+        models.Notification.is_read == False
+    ).scalar() #scalar() = returns the result as a single value (int, float, string, etc.)
+
+    return {
+        "unread_count": count
+    }
+
+@router.put("/preferences")
+def update_preferences(
+    prefs: PreferenceUpdateSchema,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role("USER", "VENDOR", "ADMIN"))
+):
+    preference = db.query(models.NotificationPreference).filter(
+        models.NotificationPreference.user_id == current_user.id
+    ).first()
+
+    if not preference:
+        preference = models.NotificationPreference(user_id=current_user.id)
+        db.add(preference)
+
+    preference.order_enabled = prefs.order_enabled
+    preference.vendor_enabled = prefs.vendor_enabled
+
+    db.commit()
+
+    return {"message": "Preferences updated"}
+
+## FOR TESTING PURPOSES ONLY
+# @router.get("/test")
+# async def test_notification(
+#     db: Session = Depends(get_db),
+#     current_user = Depends(require_role("USER", "ADMIN", "VENDOR"))
+# ):
+#     await manager.publish(
+#         current_user.id,
+#         {
+#             "type": "unread_count_update",
+#             "unread_count": 999
+#         }
+#     )
+
+#     return {"message": "Test sent"}
