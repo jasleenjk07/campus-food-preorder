@@ -7,51 +7,75 @@ from typing import Dict, List #store connections per user
 
 from fastapi import WebSocket
 
-from app.config import settings
+from app.config import settings #loads .env variables
+from app.auth.jwt import decode_access_token
 
 class RedisConnectionManager: #WebSocket manager
     def __init__(self):
-        self.active_connections: Dict[int, List[WebSocket]] = {}
-        self.redis = redis.from_url(settings.REDIS_URL, decode_responses=True) #Connects to Redis.
-        self.pubsub = self.redis.pubsub() #Creates Redis PubSub object. This is used to: Subscribe to channels, Listen for messages
+        self.redis = redis.from_url(settings.REDIS_URL) #Connects to Redis.
+        self.active_connections: Dict[int, List[WebSocket]] = {}  # multiple connections per user
 
+    async def connect(self, websocket: WebSocket, token: str):
+        await websocket.accept()
+        
+        try:
+            payload = decode_access_token(token)
+            user_id = payload.get("user_id")
 
-    async def connect(self, user_id: int, webSocket: WebSocket): #accepts user_id and WebSocket object, adds it to active_connections
-        await webSocket.accept()
+            if not user_id:
+                await websocket.close(code=1008)
+                return None
+
+        except Exception:
+            await websocket.close(code=1008)
+            return None
 
         if user_id not in self.active_connections:
             self.active_connections[user_id] = []
 
-        self.active_connections[user_id].append(webSocket)
+        self.active_connections[user_id].append(websocket)
 
-    def disconnect(self, user_id: int, websocket: WebSocket): #removes WebSocket from active_connections
-        self.active_connections[user_id].remove(websocket)
-        if not self.active_connections[user_id]:
-            del self.active_connections[user_id]
-    
-    async def publish(self, user_id: int, message: dict): #publishes message to Redis channel
-        await self.redis.publish(
-            f"user:{user_id}", 
-            json.dumps(message)
-        )
+        return user_id
+
+    def disconnect(self, websocket: WebSocket):
+        for user_id, connections in list(self.active_connections.items()):
+            if websocket in connections:
+                connections.remove(websocket)
+                if not connections:
+                    del self.active_connections[user_id]
+                break
 
     async def start_listener(self):
-        await self.pubsub.psubscribe("user:*") #Subscribes to all channels starting with "user:"
+        pubsub = self.redis.pubsub()
+        await pubsub.subscribe("notifications")
 
-        async for message in self.pubsub.listen(): #Listens for messages on all subscribed channels
-            if message["type"] == "pmessage": #Handle messages
-                channel = message["channel"]
-                data = message["data"]
+        async for message in pubsub.listen(): #Listens for messages on all subscribed channels
+            if message["type"] != "message": #Handle messages
+                continue
 
-                # Extract user_id from channel name
-                user_id = int(channel.split(":")[1])
+            data = message["data"]
 
-                # Parse JSON message
+            if not data:
+                continue
+            
+            if isinstance(data, bytes):
+                data = data.decode("utf-8")
+
+            try:
                 parsed_data = json.loads(data)
+            except:
+                continue
+                
+            user_id = parsed_data["user_id"]
 
-                # Send message to all connected WebSockets for this user
-                if user_id in self.active_connections:
-                    for ws in self.active_connections[user_id]:
-                        await ws.send_json(parsed_data)
+            if user_id in self.active_connections:
+                connections = self.active_connections[user_id]
+                for websocket in list(connections):
+                    try:
+                        await websocket.send_json(parsed_data)
+                    except Exception:
+                        connections.remove(websocket)
+                if not connections:
+                    del self.active_connections[user_id]
 
 manager = RedisConnectionManager()
