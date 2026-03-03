@@ -1,8 +1,5 @@
-#Connect Database to app
 import logging #Python’s built-in logging module. Logging means: Recording what your application is doing while it is running.
-
 import asyncio
-
 import redis.asyncio as redis
 
 from fastapi import FastAPI, Request, HTTPException
@@ -14,7 +11,7 @@ from starlette.middleware.base import BaseHTTPMiddleware #BaseHTTPMiddleware all
 
 from app.database import engine, SessionLocal
 from app import models
-from app.routers import auth, users, admin, menu, orders, notifications, ws
+from app.routers import auth, users, admin, menu, orders, notifications, ws, cart, pickup
 from app.config import settings
 from app.core.rate_limiter import limiter #Main rate limit engine
 from app.core.redis_ws import manager
@@ -75,6 +72,8 @@ app.include_router(menu.router, prefix=f"{API_V1_PREFIX}/menu")
 app.include_router(orders.router, prefix=f"{API_V1_PREFIX}/orders") #Registers all order routes with your FastAPI app.
 app.include_router(notifications.router, prefix=f"{API_V1_PREFIX}/notifications")
 app.include_router(ws.router, prefix=f"{API_V1_PREFIX}", tags=["WebSocket"])
+app.include_router(cart.router, prefix=f"{API_V1_PREFIX}/cart")
+app.include_router(pickup.router, prefix=f"{API_V1_PREFIX}/pickup")
 
 #A simple test API 
 @app.get("/")
