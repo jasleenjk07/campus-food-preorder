@@ -4,6 +4,7 @@ from sqlalchemy import Column, Integer, String, ForeignKey, Float, Boolean, Date
 from sqlalchemy.orm import relationship
 from .database import Base
 from datetime import datetime
+from pydantic import BaseModel, Field
 
 class User(Base):
     __tablename__ = "users"
@@ -13,6 +14,9 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     role = Column(String, index=True, nullable=False) #USER OR VENDOR
+
+    opening_hour = Column(Integer, nullable=True)
+    closing_hour = Column(Integer, nullable=True)
     university_id = Column(Integer, nullable=True)
 
 class FoodItem(Base):
@@ -89,3 +93,7 @@ class NotificationPreference(Base):
 
     order_enabled = Column(Boolean, default=True)
     vendor_enabled = Column(Boolean, default=True)
+
+class VendorHoursUpdate(BaseModel):
+    opening_hour: int = Field(..., ge=0, le=23, description="Opening hour in 24h format (0-23)")
+    closing_hour: int = Field(..., ge=0, le=23, description="Closing hour in 24h format (0-23)")
