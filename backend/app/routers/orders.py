@@ -81,9 +81,11 @@ def my_orders(
     db: Session = Depends(get_db),
     current_user = Depends(require_role("USER"))
 ):
-    return db.query(models.Order).filter(
+    orders = db.query(models.Order).filter(
         models.Order.user_id == current_user.id
     ).all()
+
+    return orders
 
 @router.get("/vendor", response_model=list[OrderResponse])
 def vendor_orders(
@@ -115,7 +117,8 @@ def prepare_order(
     vendor = Depends(require_role("VENDOR")) #Only users with role VENDOR can access this
 ):
     order = (                                               #SELECT orders.*
-        db.query(models.Order)                              #FROM orders
+        db.query(models.Order) 
+        .join(models.OrderItem)                             #FROM orders
         .join(models.FoodItem)                             #JOIN food_items ON orders.food_id = food_items.id
         .filter(
             models.Order.id == order_id,                    #WHERE orders.id = :order_id
@@ -131,6 +134,8 @@ def prepare_order(
         raise HTTPException(status_code=400, detail="Order must be paid before preparation")
 
     validate_transition(order.status, "PREPARING") #Moves order from PLACED → PREPARING
+
+    order.status = "PREPARING"
     db.commit()
     db.refresh(order)
 
@@ -139,6 +144,7 @@ def prepare_order(
         order.user_id,
         f"Your order #{order.id} is being prepared"
     )
+
     return order
 
 @router.put("/{order_id}/deliver", response_model=OrderResponse)
@@ -149,6 +155,7 @@ def deliver_order(
 ):
     order =(
         db.query(models.Order)
+        .join(models.OrderItem)
         .join(models.FoodItem)
         .filter(
             models.Order.id == order_id,
@@ -205,6 +212,23 @@ def cancel_order(
     # ADMIN can cancel anytime
     validate_transition(order.status, "CANCELLED")
 
+    order.status = "CANCELLED"
+
+    #RESTORE STOCK
+    for item in order.items:
+        food = db.query(models.FoodItem).filter(
+            models.FoodItem.id == item.food_id
+        ).with_for_update().first()
+
+        food.stock += item.quantity
+
+        # Notify each vendor (in case of multi-vendor future)
+        create_notification(
+            db,
+            food.vendor_id,
+            f"Order #{order.id} was cancelled"
+        )
+
     db.commit()
     db.refresh(order)
 
@@ -212,12 +236,6 @@ def cancel_order(
         db, 
         order.user_id,
         f"Your order #{order.id} was cancelled"
-    )
-
-    create_notification(
-        db,
-        order.food.vendor_id,
-        f"Order #{order.id} was cancelled"
     )
 
     return order
@@ -297,3 +315,72 @@ def pay_for_order(
     )
 
     return order
+
+@router.post("/checkout")
+def checkout(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role("USER"))
+):
+    cart_items = db.query(models.CartItem).filter(
+        models.CartItem.user_id == current_user.id
+    ).all()
+
+    if not cart_items:
+        raise HTTPException(status_code=400, detail="Cart is empty")
+
+    #Create Order
+    order = models.Order(
+        user_id=current_user.id,
+        status="PLACED",
+        total_price=0
+    )
+    db.add(order)
+    db.flush()
+
+    total = 0
+
+    for item in cart_items:
+        food = db.query(models.FoodItem).filter(
+            models.FoodItem.id == item.food_id
+        ).with_for_update().first()
+
+        if not food:
+            raise HTTPException(status_code=404, detail="Food not found")
+
+        if not food.is_available:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{food.name} is currently unavailable"
+            )
+
+        if food.stock < item.quantity:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Not enough stock for {food.name}"
+            )
+
+        food.stock -= item.quantity
+
+        order_item = models.OrderItem(
+            order_id=order.id,
+            food_id=food.id,
+            quantity=item.quantity,
+            price_at_time=food.price
+        )
+
+        total += food.price * item.quantity
+        db.add(order_item)
+    
+    order.total_price = total
+
+    db.query(models.CartItem).filter(
+        models.CartItem.user_id == current_user.id
+    ).delete()
+
+    db.commit()
+
+    return {
+        "message": "Order placed successfully",
+        "order_id": order.id,
+        "total": total
+    }
