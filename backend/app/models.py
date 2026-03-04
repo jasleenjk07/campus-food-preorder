@@ -15,6 +15,8 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     role = Column(String, index=True, nullable=False) #USER OR VENDOR
 
+    wallet_balance = Column(Float, default = 0.0)
+
     opening_hour = Column(Integer, nullable=True)
     closing_hour = Column(Integer, nullable=True)
     university_id = Column(Integer, nullable=True)
@@ -52,6 +54,7 @@ class Order(Base):
     total_price = Column(Float)
 
     status = Column(String, default="PLACED", index=True)
+    pickup_time = Column(String)
     is_paid = Column(Boolean, default=False)
     payment_method = Column(String, nullable=True)
     idempotency_key = Column(String, unique=True, nullable=True)

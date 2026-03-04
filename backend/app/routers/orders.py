@@ -6,12 +6,13 @@ from sqlalchemy.orm import Session #Session represents a database connection
 
 from app.database import get_db #get_db provides a database session per request
 from app import models
-from app.schemas import OrderCreate, OrderResponse, PaymentMethod
+from app.schemas import OrderCreate, OrderResponse, PaymentMethod, CheckoutRequest
 from app.auth.roles import require_role
 from app.utils import create_notification
 from app.tasks.notifications import send_notification_task,send_email_notification
 from app.core.rate_limiter import limiter
 from app.core.order_state import validate_transition
+import app.services.pickup_service as pickup_service
 
 router = APIRouter(tags=["Orders"])
 
@@ -318,6 +319,7 @@ def pay_for_order(
 
 @router.post("/checkout")
 def checkout(
+    request: CheckoutRequest,
     db: Session = Depends(get_db),
     current_user = Depends(require_role("USER"))
 ):
@@ -328,11 +330,40 @@ def checkout(
     if not cart_items:
         raise HTTPException(status_code=400, detail="Cart is empty")
 
-    #Create Order
+    # Get vendor from first cart item (single vendor assumption for now)
+    first_food = db.query(models.FoodItem).filter(
+        models.FoodItem.id == cart_items[0].food_id
+    ).first()
+
+    if not first_food:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    vendor = db.query(models.User).filter(
+        models.User.id == first_food.vendor_id,
+        models.User.role == "VENDOR"
+    ).first()
+
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    # Validate pickup time
+    available_slots = pickup_service.generate_pickup_slots(
+        opening_hour=vendor.opening_hour,
+        closing_hour=vendor.closing_hour
+    )
+
+    if request.pickup_time not in available_slots:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired pickup time"
+        )
+
+    # Create Order
     order = models.Order(
         user_id=current_user.id,
         status="PLACED",
-        total_price=0
+        total_price=0,
+        pickup_time=request.pickup_time
     )
     db.add(order)
     db.flush()
@@ -370,7 +401,7 @@ def checkout(
 
         total += food.price * item.quantity
         db.add(order_item)
-    
+
     order.total_price = total
 
     db.query(models.CartItem).filter(
@@ -382,5 +413,60 @@ def checkout(
     return {
         "message": "Order placed successfully",
         "order_id": order.id,
-        "total": total
+        "total": total,
+        "pickup_time": order.pickup_time
+    }
+
+@router.put("/vendor/hours")
+def update_vendor_hours(
+    request: models.VendorHoursUpdate,
+    db: Session = Depends(get_db),
+    vendor = Depends(require_role("VENDOR"))
+):
+    # Business validation
+    if request.closing_hour <= request.opening_hour:
+        raise HTTPException(
+            status_code=400,
+            detail="Closing hour must be greater than opening hour"
+        )
+
+    # Update vendor hours
+    vendor.opening_hour = request.opening_hour
+    vendor.closing_hour = request.closing_hour
+
+    db.commit()
+    db.refresh(vendor)
+
+    return {
+        "message": "Working hours updated successfully",
+        "opening_hour": vendor.opening_hour,
+        "closing_hour": vendor.closing_hour
+    }
+
+@router.get("/vendors/{vendor_id}/pickup-slots")
+def get_vendor_pickup_slots(
+    vendor_id: int,
+    db: Session = Depends(get_db)
+):
+    print(f"Vendor ID: {vendor_id}")
+    vendor = db.query(models.User).filter(
+        models.User.id == vendor_id,
+        models.User.role == "VENDOR"
+    ).first()
+
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    if vendor.opening_hour is None or vendor.closing_hour is None:
+        raise HTTPException(status_code=400, detail="Vendor working hours not configured")
+
+    slots = pickup_service.generate_pickup_slots(
+        opening_hour=vendor.opening_hour,
+        closing_hour=vendor.closing_hour
+    )
+
+    return {
+        "is_open": len(slots) > 0,
+        "next_available": slots[0] if slots else None,
+        "slots": slots
     }
