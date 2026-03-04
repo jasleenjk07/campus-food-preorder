@@ -11,7 +11,17 @@ from starlette.middleware.base import BaseHTTPMiddleware #BaseHTTPMiddleware all
 
 from app.database import engine, SessionLocal
 from app import models
-from app.routers import auth, users, admin, menu, orders, notifications, ws, cart, pickup
+
+from app.routers import auth
+from app.routers import users
+from app.routers import admin
+from app.routers import menu
+from app.routers import orders
+from app.routers import notifications
+from app.routers import ws
+from app.routers import cart
+from app.routers.pickup import router as pickup_router
+
 from app.config import settings
 from app.core.rate_limiter import limiter #Main rate limit engine
 from app.core.redis_ws import manager
@@ -73,7 +83,7 @@ app.include_router(orders.router, prefix=f"{API_V1_PREFIX}/orders") #Registers a
 app.include_router(notifications.router, prefix=f"{API_V1_PREFIX}/notifications")
 app.include_router(ws.router, prefix=f"{API_V1_PREFIX}", tags=["WebSocket"])
 app.include_router(cart.router, prefix=f"{API_V1_PREFIX}/cart")
-app.include_router(pickup.router, prefix=f"{API_V1_PREFIX}/pickup")
+app.include_router(pickup_router, prefix=f"{API_V1_PREFIX}/pickup")
 
 #A simple test API 
 @app.get("/")
