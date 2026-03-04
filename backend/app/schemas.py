@@ -1,7 +1,7 @@
 from datetime import datetime
 from pydantic import BaseModel, EmailStr #Pyndatic is used to validate the incoming data, automatically reject bad requests and convert data to python objects
 from enum import Enum
-from typing import List
+from typing import List, Union
 
 class UserRole(str, Enum):
     USER = "USER"
@@ -15,14 +15,34 @@ class UserCreate(BaseModel):
     university_id: int | None = None
     role: UserRole
     
-class UserResponse(BaseModel): ##This schema defines what data the API sends back after registration
+class UserBase(BaseModel):
     id: int
     name: str
     email: EmailStr
     role: str
 
-    class Config: ##It allows Pydantic (schemas) to read data from SQLAlchemy ORM objects.
+    class Config:
         from_attributes = True
+
+
+class UserPublic(UserBase):
+    """Data safe to expose publicly"""
+    pass
+
+
+class UserPrivate(UserBase):
+    """Data returned only to the authenticated user"""
+    wallet_balance: float
+
+
+class VendorPublic(UserBase):
+    """Public vendor data visible to users"""
+    pass
+
+
+class VendorPrivate(UserBase):
+    """Vendor data visible only to the vendor"""
+    pass
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -31,7 +51,7 @@ class LoginRequest(BaseModel):
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    user: UserResponse
+    user: Union[UserPrivate, VendorPrivate]
 
 class FoodCreate(BaseModel): #Rules for food data coming INTO the backend (What client sends)
     name: str
@@ -98,6 +118,19 @@ class PaymentMethod(str, Enum):
     COD = "COD"
     PAY_LATER = "PAY_LATER"
 
+class PaymentSummaryResponse(BaseModel):
+    item_total: float
+    service_fee: float
+    final_total: float
+    item_count: int
+    wallet_balance: float
+    wallet_enabled: bool
+    upi_enabled: bool
+    card_enabled: bool
+
+class ConfirmPaymentRequest(BaseModel):
+    payment_method: str
+
 class NotificationResponse(BaseModel):
     id: int
     message: str
@@ -105,7 +138,7 @@ class NotificationResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        form_attributes = True
+        from_attributes = True
 
 class PreferenceUpdateSchema(BaseModel):
     order_enabled: bool
