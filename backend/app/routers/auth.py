@@ -1,21 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import Union
 from fastapi.security import OAuth2PasswordRequestForm
 
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app import models
-from app.schemas import UserCreate, UserResponse
+from app.schemas import UserCreate, UserPrivate, VendorPrivate
 from app.utils import hash_password
 from app.utils import verify_password
 from app.auth.jwt import create_access_token
-from app.schemas import LoginRequest, LoginResponse
+from app.schemas import LoginResponse, UserPrivate, VendorPrivate, UserCreate
 from app.auth.roles import require_role
 from app.core.rate_limiter import limiter
 
 router = APIRouter(tags=["Auth"])
 
-@router.post("/register", response_model=UserResponse)
+@router.post("/register", response_model=Union[UserPrivate, VendorPrivate])
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
     #Check if user already exists
     existing_user = db.query(models.User).filter(
@@ -38,9 +39,11 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
 
-    return new_user
+    if new_user.role == "VENDOR":
+        return VendorPrivate.from_orm(new_user)
+    return UserPrivate.from_orm(new_user)
 
-@router.post("/create-user", response_model=UserResponse)
+@router.post("/create-user", response_model=Union[UserPrivate, VendorPrivate])
 def create_user_by_admin(
     user: UserCreate,
     db: Session = Depends(get_db),
@@ -58,7 +61,9 @@ def create_user_by_admin(
     db.commit()
     db.refresh(new_user)
 
-    return new_user
+    if new_user.role == "VENDOR":
+        return VendorPrivate.from_orm(new_user)
+    return UserPrivate.from_orm(new_user)
     
 @router.post("/login", response_model=LoginResponse)
 @limiter.limit("5/minute")
@@ -76,8 +81,13 @@ def login_user(
 
     token = create_access_token({"user_id": user.id, "role": user.role})
 
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": user
-    }
+    if user.role == "VENDOR":
+        user_data = VendorPrivate.from_orm(user)
+    else:
+        user_data = UserPrivate.from_orm(user)
+
+    return LoginResponse(
+        access_token=token,
+        token_type="bearer",
+        user=user_data
+    )
