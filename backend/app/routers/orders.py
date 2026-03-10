@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session #Session represents a database connection
 
 from app.database import get_db #get_db provides a database session per request
 from app import models
-from app.schemas import OrderCreate, OrderResponse, PaymentMethod, CheckoutRequest
+from app.schemas import OrderCreate, OrderResponse, PaymentMethod, CheckoutRequest, PaymentSummaryResponse, ConfirmPaymentRequest
 from app.auth.roles import require_role
 from app.utils import create_notification
 from app.tasks.notifications import send_notification_task,send_email_notification
@@ -411,10 +411,10 @@ def checkout(
     db.commit()
 
     return {
-        "message": "Order placed successfully",
         "order_id": order.id,
-        "total": total,
-        "pickup_time": order.pickup_time
+        "status": order.status,
+        "pickup_time": order.pickup_time,
+        "total": total
     }
 
 @router.put("/vendor/hours")
@@ -469,4 +469,79 @@ def get_vendor_pickup_slots(
         "is_open": len(slots) > 0,
         "next_available": slots[0] if slots else None,
         "slots": slots
+    }
+
+@router.get("/payment-summary", response_model=PaymentSummaryResponse)
+def get_payment_summary(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role("USER"))
+):
+    order = db.query(models.Order).filter(
+        models.Order.user_id == current_user.id,
+        models.Order.status == "PLACED"
+    ).order_by(models.Order.id.desc()).first()
+
+    if not order:
+        raise HTTPException(status_code=400, detail="No pending order found")
+
+    items = []
+
+    for item in order.items:
+        food = db.query(models.FoodItem).filter(
+            models.FoodItem.id == item.food_id
+        ).first()
+
+        items.append({
+            "name": food.name,
+            "quantity": item.quantity,
+            "price": item.price_at_time * item.quantity
+        })
+
+    item_total = order.total_price
+    service_fee = 10.0
+    final_total = item_total + service_fee
+
+    return {
+        "items": items,
+        "item_total": item_total,
+        "service_fee": service_fee,
+        "final_total": final_total,
+        "item_count": len(order.items),
+        "wallet_balance": current_user.wallet_balance,
+        "wallet_enabled": True,
+        "upi_enabled": True,
+        "card_enabled": True
+    }
+
+@router.post("/confirm-payment")
+def confirm_payment(
+    data: ConfirmPaymentRequest,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role("USER"))
+):
+    order = db.query(models.Order).filter(
+        models.Order.user_id == current_user.id,
+        models.Order.status == "PLACED"
+    ).order_by(models.Order.id.desc()).first()
+
+    if not order:
+        raise HTTPException(status_code=400, detail="No pending order found")
+
+    item_total = order.total_price
+    service_fee = 10.0
+    final_total = item_total + service_fee
+    
+    if data.payment_method == "wallet":
+        if current_user.wallet_balance < final_total:
+            raise HTTPException(status_code=400, detail="Insufficient wallet balance")
+        
+        current_user.wallet_balance -= final_total
+
+    order.is_paid = True
+    order.status = "PAID"
+
+    db.commit()
+
+    return {
+        "message": "Payment successful"
     }
