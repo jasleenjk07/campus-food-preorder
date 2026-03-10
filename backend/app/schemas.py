@@ -119,6 +119,7 @@ class PaymentMethod(str, Enum):
     PAY_LATER = "PAY_LATER"
 
 class PaymentSummaryResponse(BaseModel):
+    items: List[PaymentItem]
     item_total: float
     service_fee: float
     final_total: float
@@ -149,3 +150,8 @@ class PreferenceUpdateSchema(BaseModel):
     
 class CheckoutRequest(BaseModel):
     pickup_time: str
+
+class PaymentItem(BaseModel):
+    name: str
+    quantity: int
+    price: float
