@@ -92,6 +92,27 @@ class OrderResponse(BaseModel): #This defines what the API sends back after. It 
     class Config:
         from_attributes = True #Pydantic automatically converts DB object → API response
 
+class OrderHistoryItem(BaseModel):
+    food_name: str
+    quantity: int
+    price_at_time: float
+
+class OrderHistoryResponse(BaseModel):
+    order_id: int
+    vendor_name: str
+    total_items: int
+    total_price: float
+    status: str
+    pickup_time: datetime
+    is_paid: bool
+    payment_method: str | None
+    created_at: datetime
+
+    items: List[OrderHistoryItem]
+
+    class Config:
+        from_attributes = True
+
 class CartAddRequest(BaseModel):
     food_id: int
     quantity: int = 1
@@ -130,7 +151,7 @@ class PaymentSummaryResponse(BaseModel):
     card_enabled: bool
 
 class ConfirmPaymentRequest(BaseModel):
-    payment_method: str
+    payment_method: PaymentMethod | None
 
 class NotificationResponse(BaseModel):
     id: int
