@@ -2,11 +2,11 @@ import random
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, Header
 
-from sqlalchemy.orm import Session #Session represents a database connection
+from sqlalchemy.orm import Session, joinedload #Session represents a database connection
 
 from app.database import get_db #get_db provides a database session per request
 from app import models
-from app.schemas import OrderCreate, OrderResponse, PaymentMethod, CheckoutRequest, PaymentSummaryResponse, ConfirmPaymentRequest
+from app.schemas import OrderCreate, OrderResponse, OrderHistoryResponse, OrderHistoryItem, PaymentMethod, CheckoutRequest, PaymentSummaryResponse, ConfirmPaymentRequest
 from app.auth.roles import require_role
 from app.utils import create_notification
 from app.tasks.notifications import send_notification_task,send_email_notification
@@ -545,3 +545,44 @@ def confirm_payment(
     return {
         "message": "Payment successful"
     }
+
+@router.get("/history", response_model=list[OrderHistoryResponse])
+async def get_order_history(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role("USER"))
+):
+    orders = db.query(models.Order).options(
+        joinedload(models.Order.vendor),
+        joinedload(models.Order.items).joinedload(models.OrderItem.food)
+    ).filter(
+        models.Order.user_id == current_user.id
+    ).order_by(models.Order.created_at.desc()).all()
+
+    order_history = []
+
+    for order in orders:
+        total_items = sum(item.quantity for item in order.items)
+
+        items = []
+
+        for item in order.items:
+            items.append({
+                "food_name": item.food.name,
+                "quantity": item.quantity,
+                "price_at_time": item.price_at_time
+            })
+
+        order_history.append({
+            "order_id": order.id,
+            "vendor_name": order.vendor.name,
+            "total_items": total_items,
+            "total_price": order.total_price,
+            "status": order.status,
+            "pickup_time": order.pickup_time,
+            "is_paid": order.is_paid,
+            "payment_method": order.payment_method,
+            "created_at": order.created_at,
+            "items": items
+        })
+
+    return order_history
