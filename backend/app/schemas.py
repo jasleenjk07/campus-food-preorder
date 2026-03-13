@@ -139,6 +139,14 @@ class PaymentMethod(str, Enum):
     COD = "COD"
     PAY_LATER = "PAY_LATER"
 
+class PaymentItem(BaseModel):
+    food_name: str
+    quantity: int
+    price: float
+
+    class Config:
+        from_attributes = True
+
 class PaymentSummaryResponse(BaseModel):
     items: List[PaymentItem]
     item_total: float
