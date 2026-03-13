@@ -49,13 +49,22 @@ async def place_order(
     total_price = food.price * order.quantity
 
     new_order = models.Order(
-        user_id = current_user.id,
-        food_id = food.id,
-        quantity = order.quantity,
-        total_price = total_price
+        user_id=current_user.id,
+        total_price=total_price,
+        status="PLACED"
     )
 
     db.add(new_order)
+    db.flush()
+
+    order_item = models.OrderItem(
+        order_id=new_order.id,
+        food_id=food.id,
+        quantity=order.quantity,
+        price_at_time=food.price
+    )
+
+    db.add(order_item)
     db.commit()
     db.refresh(new_order)
 
@@ -552,8 +561,9 @@ async def get_order_history(
     current_user = Depends(require_role("USER"))
 ):
     orders = db.query(models.Order).options(
-        joinedload(models.Order.vendor),
-        joinedload(models.Order.items).joinedload(models.OrderItem.food)
+        joinedload(models.Order.items)
+        .joinedload(models.OrderItem.food)
+        .joinedload(models.FoodItem.vendor)
     ).filter(
         models.Order.user_id == current_user.id
     ).order_by(models.Order.created_at.desc()).all()
@@ -572,13 +582,17 @@ async def get_order_history(
                 "price_at_time": item.price_at_time
             })
 
+        vendor_name = None
+        if order.items and order.items[0].food and order.items[0].food.vendor:
+            vendor_name = order.items[0].food.vendor.name
+
         order_history.append({
             "order_id": order.id,
-            "vendor_name": order.vendor.name,
+            "vendor_name": vendor_name,
             "total_items": total_items,
             "total_price": order.total_price,
             "status": order.status,
-            "pickup_time": order.pickup_time,
+            "pickup_time": order.pickup_time if order.pickup_time else order.created_at,
             "is_paid": order.is_paid,
             "payment_method": order.payment_method,
             "created_at": order.created_at,
