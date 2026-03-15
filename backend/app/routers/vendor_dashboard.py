@@ -38,10 +38,11 @@ def vendor_dashboard(
     )
 
     return {
+        "vendor_name": vendor.name,
         "today_orders": len(today_orders),
         "pending_orders": len(pending),
         "preparing_orders": len(preparing),
-        "completed_orders": len(delivered),
+        "delivered_orders": len(delivered),
         "today_revenue": today_revenue
     }
 
