@@ -1,0 +1,33 @@
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# Virtual environments
+venv
+.env
+.env.*
+
+# Git
+.git
+.gitignore
+
+# OS
+.DS_Store
+
+# Node (if frontend exists)
+node_modules
+
+# IDE
+.vscode
+.idea
+
+# Docker
+Dockerfile
+docker-compose.yml
+
+# Database / cache
+*.db
+*.sqlite3

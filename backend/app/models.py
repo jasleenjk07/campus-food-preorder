@@ -32,7 +32,7 @@ class FoodItem(Base):
     stock=Column(Integer, default=0)
 
     vendor_id = Column(Integer, ForeignKey("users.id"), index=True)
-    vendor = relationship("User")
+    vendor = relationship("User", backref="food_items")
 
 class CartItem(Base):
     __tablename__ = "cart_items"
@@ -51,23 +51,34 @@ class Order(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), index=True) #This order belongs to a user from the users table
+    vendor_id = Column(Integer, ForeignKey("users.id"), index=True) #This order belongs to a vendor from the users table
+    
     total_price = Column(Float)
 
     status = Column(String, default="PLACED", index=True)
-    pickup_time = Column(String)
+    pickup_time = Column(DateTime)
+
     is_paid = Column(Boolean, default=False)
     payment_method = Column(String, nullable=True)
+
     idempotency_key = Column(String, unique=True, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow, index=True) #gives current time (UTC) and automatically stores when the order was created
 
-    user = relationship("User")
-    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    user = relationship("User", foreign_keys=[user_id])
+    vendor = relationship("User", foreign_keys=[vendor_id])
+
+    items = relationship(
+        "OrderItem", 
+        back_populates="order", 
+        cascade="all, delete-orphan"
+    )
 
 class OrderItem(Base):
     __tablename__ = "order_items"
     
     id = Column(Integer, primary_key=True, index=True)
+
     order_id = Column(Integer, ForeignKey("orders.id"), index=True)
     food_id = Column(Integer, ForeignKey("food_items.id"), index=True)
 
