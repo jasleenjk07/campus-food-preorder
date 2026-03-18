@@ -21,6 +21,17 @@ class User(Base):
     closing_hour = Column(Integer, nullable=True)
     university_id = Column(Integer, nullable=True)
 
+    phone = Column(String, nullable=True)
+    shop_name = Column(String, nullable=True)
+    address = Column(String, nullable=True)
+    logo_url = Column(String, nullable=True)
+
+    bank_account_number = Column(String, nullable=True)
+    ifsc_code = Column(String, nullable=True)
+    account_holder_name = Column(String, nullable=True)
+    
+    is_open = Column(Boolean, default=True)
+
 class FoodItem(Base):
     __tablename__ = "food_items"
 
