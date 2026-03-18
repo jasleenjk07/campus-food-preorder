@@ -184,3 +184,36 @@ class PaymentItem(BaseModel):
     name: str
     quantity: int
     price: float
+
+class VendorProfileResponse(BaseModel):
+    name: str
+    email: str
+    phone: str | None
+    shop_name: str | None
+    address: str | None
+    logo_url: str | None
+    is_open: bool
+    opening_hour: int | None
+    closing_hour: int | None
+
+    class Config:
+        from_attributes = True
+
+class VendorProfileUpdate(BaseModel):
+    phone: str | None
+    shop_name: str | None
+    address: str | None
+    logo_url: str | None
+
+class BankDetailsResponse(BaseModel):
+    account_holder_name: str | None
+    bank_account_number: str | None
+    ifsc_code: str | None
+
+    class Config:
+        from_attributes = True
+
+class BankDetailsUpdate(BaseModel):
+    account_holder_name: str 
+    bank_account_number: str
+    ifsc_code: str 
