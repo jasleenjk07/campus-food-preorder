@@ -25,6 +25,7 @@ class User(Base):
     shop_name = Column(String, nullable=True)
     address = Column(String, nullable=True)
     logo_url = Column(String, nullable=True)
+    category = Column(String, nullable=True)
 
     bank_account_number = Column(String, nullable=True)
     ifsc_code = Column(String, nullable=True)
