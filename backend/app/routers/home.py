@@ -19,7 +19,6 @@ def get_home_vendors(
         result.append({
             "id": vendor.id,
             "shop_name": vendor.shop_name,
-            "category": vendor.category,
             "logo_url": vendor.logo_url,
             "is_open": vendor.is_open if vendor.is_open is not None else True,
             "delivery_time": "10-15 min"
