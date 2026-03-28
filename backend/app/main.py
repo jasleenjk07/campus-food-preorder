@@ -21,6 +21,9 @@ from app.routers import notifications
 from app.routers import ws
 from app.routers import cart
 from app.routers.pickup import router as pickup_router
+from app.routers import vendor_dashboard
+from app.routers import vendor_profile
+from app.routers import home
 
 from app.config import settings
 from app.core.rate_limiter import limiter #Main rate limit engine
@@ -84,6 +87,9 @@ app.include_router(notifications.router, prefix=f"{API_V1_PREFIX}/notifications"
 app.include_router(ws.router, prefix=f"{API_V1_PREFIX}", tags=["WebSocket"])
 app.include_router(cart.router, prefix=f"{API_V1_PREFIX}/cart")
 app.include_router(pickup_router, prefix=f"{API_V1_PREFIX}/pickup")
+app.include_router(vendor_dashboard.router, prefix=f"{API_V1_PREFIX}/vendor")
+app.include_router(vendor_profile.router, prefix=f"{API_V1_PREFIX}/vendor")
+app.include_router(home.router, prefix=f"{API_V1_PREFIX}/home")
 
 #A simple test API 
 @app.get("/")

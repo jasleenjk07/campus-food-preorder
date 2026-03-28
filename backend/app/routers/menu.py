@@ -99,3 +99,32 @@ def get_menu(db: Session = Depends(get_db)):
     )
 
     return menu_items
+
+@router.get("/vendor/{vendor_id}")
+def get_vendor_menu(
+    vendor_id: int, 
+    db: Session = Depends(get_db)
+):
+    vendor = db.query(models.User).filter(
+        models.User.id == vendor_id,
+        models.User.role == "VENDOR"
+    ).first()
+
+    if not vendor:
+        raise HTTPException(
+            status_code=404,
+            detail="Vendor not found"
+        )
+
+    menu_items = db.query(models.FoodItem).filter(
+        models.FoodItem.vendor_id == vendor_id
+    ).all()
+
+    return {
+        "vendor": {
+            "id": vendor.id,
+            "name": vendor.name,
+            "description": vendor.description
+        },
+        "menu": menu_items
+    }

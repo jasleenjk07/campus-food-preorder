@@ -1,7 +1,7 @@
 from datetime import datetime
 from pydantic import BaseModel, EmailStr #Pyndatic is used to validate the incoming data, automatically reject bad requests and convert data to python objects
 from enum import Enum
-from typing import List, Union
+from typing import List, Union, Optional
 
 class UserRole(str, Enum):
     USER = "USER"
@@ -184,3 +184,36 @@ class PaymentItem(BaseModel):
     name: str
     quantity: int
     price: float
+
+class VendorProfileResponse(BaseModel):
+    name: str
+    email: str
+    phone: str | None
+    shop_name: str | None
+    address: str | None
+    logo_url: str | None
+    is_open: bool
+    opening_hour: int | None
+    closing_hour: int | None
+
+    class Config:
+        from_attributes = True
+
+class VendorProfileUpdate(BaseModel):
+    phone: str 
+    shop_name: str 
+    address: str 
+    logo_url: Optional[str] = None
+
+class BankDetailsResponse(BaseModel):
+    account_holder_name: str | None
+    bank_account_number: str | None
+    ifsc_code: str | None
+
+    class Config:
+        from_attributes = True
+
+class BankDetailsUpdate(BaseModel):
+    account_holder_name: str 
+    bank_account_number: str
+    ifsc_code: str 

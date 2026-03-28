@@ -592,10 +592,10 @@ async def get_order_history(
             "total_items": total_items,
             "total_price": order.total_price,
             "status": order.status,
-            "pickup_time": order.pickup_time if order.pickup_time else order.created_at,
+            "pickup_time": str(order.pickup_time if order.pickup_time else order.created_at),
             "is_paid": order.is_paid,
             "payment_method": order.payment_method,
-            "created_at": order.created_at,
+            "created_at": str(order.created_at),
             "items": items
         })
 
