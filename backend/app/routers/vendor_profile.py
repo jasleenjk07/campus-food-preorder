@@ -13,7 +13,17 @@ def get_vendor_profile(
     db: Session = Depends(get_db),
     vendor = Depends(require_role("VENDOR"))
 ):
-    return vendor
+    return {
+        "name": vendor.name,
+        "shop_name": vendor.shop_name,
+        "email": vendor.email,
+        "phone": vendor.phone,
+        "address": vendor.address,
+        "logo_url": vendor.logo_url,
+        "is_open": vendor.is_open,
+        "opening_hour": vendor.opening_hour,
+        "closing_hour": vendor.closing_hour
+    }
 
 @router.put("/profile")
 def update_vendor_profile(
