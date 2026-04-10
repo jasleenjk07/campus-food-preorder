@@ -5,7 +5,7 @@ from sqlalchemy.ext.declarative import declarative_base #Used to define database
 from sqlalchemy.orm import sessionmaker #Used to talk to the database (read/write data)
 from sqlalchemy.orm import Session #Used for querying and saving data
 from fastapi import Depends #Lets FastAPI automatically provide things to your API functions
-from app.config import settings
+from .config import settings
 
 engine = create_engine(settings.DATABASE_URL) #Engine is the main connection controller knows how to connect and where to connect
 
