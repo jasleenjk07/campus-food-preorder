@@ -1,6 +1,9 @@
 #Central configuration manager for the backend.
 from pydantic_settings import BaseSettings #BaseSettings automatically: Reads values from .env, Converts types automatically, Validates them, Throws error if something is missing
 from pydantic import field_validator
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 class Settings(BaseSettings):
     DATABASE_URL: str
@@ -28,6 +31,7 @@ class Settings(BaseSettings):
         return v
 
     class Config:
-        env_file = ".env" #Load environment variables from .env automatically.
+        env_file = BASE_DIR / ".env" #Load environment variables from .env automatically.
+        env_file_encoding = "utf-8"
 
 settings = Settings()
