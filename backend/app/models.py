@@ -40,6 +40,10 @@ class FoodItem(Base):
     name = Column(String, nullable=False)
     description = Column(String)
     price = Column(Float, nullable=False)
+
+    category = Column(String, nullable=True)
+    image_url = Column(String, nullable=True)
+    
     is_available = Column(Boolean, default=True, index=True)
     stock=Column(Integer, default=0)
 
