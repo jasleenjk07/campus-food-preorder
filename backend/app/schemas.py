@@ -27,7 +27,11 @@ class UserBase(BaseModel):
 
 class UserPublic(UserBase):
     """Data safe to expose publicly"""
-    pass
+
+    shop_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 
 class UserPrivate(UserBase):
@@ -37,7 +41,13 @@ class UserPrivate(UserBase):
 
 class VendorPublic(UserBase):
     """Public vendor data visible to users"""
-    pass
+
+    shop_name: Optional[str] = None
+    category: Optional[str] = None
+    logo_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 
 class VendorPrivate(UserBase):
@@ -57,16 +67,27 @@ class FoodCreate(BaseModel): #Rules for food data coming INTO the backend (What 
     name: str
     description: str | None = None
     price: float
+    category: str | None = None
+    image_url: str | None = None
+    is_available: bool = True
 
 class FoodResponse(BaseModel): #Clean, safe data sent OUT to frontend (What client receives)
     id: int
     name: str
     description: str | None
     price: float
+    category: str | None
+    image_url: str | None
     is_available: bool
 
     class Config: #How data is stored
         from_attributes = True
+    
+class FoodUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = None
+    is_available: Optional[bool] = None
 
 class OrderCreate(BaseModel): #This defines what data the client must send when placing an order.
     food_id: int
