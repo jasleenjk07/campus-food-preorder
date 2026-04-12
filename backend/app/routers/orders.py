@@ -103,10 +103,11 @@ def vendor_orders(
     current_user = Depends(require_role("VENDOR"))
 ):
     return (
-        db.query(models.Order) #Start querying the orders table
-        .join(models.FoodItem) #SQL JOIN between:orders.food_id and food_items.id. This allows access to food-related columns (like vendor_id)
-        .filter(models.FoodItem.vendor_id == current_user.id) #Restrict results to orders where the food item belongs to the logged-in vendor
-        .all() #Returns a list of orders and empty if no orders are found
+        db.query(models.Order)
+        .join(models.OrderItem) 
+        .join(models.FoodItem) 
+        .filter(models.FoodItem.vendor_id == current_user.id)
+        .all()
     )
 
 @router.get("/admin", response_model=list[OrderResponse])
