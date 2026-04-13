@@ -5,6 +5,7 @@ import redis.asyncio as redis
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse #Custom error response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from starlette.exceptions import HTTPException as StarletteHTTPException #To catch ALL HTTP errors globally
 from starlette.middleware.base import BaseHTTPMiddleware #BaseHTTPMiddleware allows you to intercept: Incoming request, Outgoing response. Before it reaches the client.
@@ -90,6 +91,8 @@ app.include_router(pickup_router, prefix=f"{API_V1_PREFIX}/pickup")
 app.include_router(vendor_dashboard.router, prefix=f"{API_V1_PREFIX}/vendor")
 app.include_router(vendor_profile.router, prefix=f"{API_V1_PREFIX}/vendor")
 app.include_router(home.router, prefix=f"{API_V1_PREFIX}/home")
+
+app.mount("/uploads", StaticFiles(directory="Uploads"), name="uploads")
 
 #A simple test API 
 @app.get("/")
