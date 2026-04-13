@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile, File
+import shutil
+import os
 
 from sqlalchemy.orm import Session
 
@@ -7,6 +9,8 @@ from app.schemas import VendorProfileResponse, VendorProfileUpdate, BankDetailsR
 from app.auth.roles import require_role
 
 router = APIRouter(tags=["vendor"])
+
+UPLOAD_DIR = "uploads"
 
 @router.get("/profile", response_model=VendorProfileResponse)
 def get_vendor_profile(
@@ -81,3 +85,16 @@ def update_bank_details(
     db.commit()
 
     return {"message": "Bank details updated successfully"}
+
+@router.post("/upload/image")
+def upload_image(file: UploadFile = File(...)):
+    os.makedirs(UPLOAD_DIR, exist_ok = True)
+
+    file_path = f'{UPLOAD_DIR}/{file.filename}'
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    return {
+        "url": f"http://10.0.2.2:8000/{file_path}"
+    }

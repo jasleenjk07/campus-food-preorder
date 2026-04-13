@@ -1,14 +1,14 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app import models
-from app.schemas import FoodCreate, FoodResponse
+from app.schemas import FoodCreate, FoodResponse, FoodUpdate
 from app.auth.roles import require_role
 from app.core.cache import get_cache, set_cache, delete_cache
 
-from fastapi import HTTPException
+from typing import List
 
 router = APIRouter(tags=["Menu"])
 
@@ -22,6 +22,9 @@ def add_food(
         name = food.name,
         description = food.description,
         price = food.price,
+        category = food.category,
+        image_url = food.image_url,
+        is_available = food.is_available,
         vendor_id = current_user.id #Automatically links food to the logged-in vendor/admin
     )
 
@@ -34,17 +37,17 @@ def add_food(
 
     return new_food
 
-@router.put("/{food_id}, response_model=FoodResponse")
+@router.put("/{food_id}", response_model=FoodResponse)
 def update_food(
     food_id: int,
-    food: FoodCreate,
+    food: FoodUpdate,
     db: Session = Depends(get_db),
     current_user = Depends(require_role("ADMIN", "VENDOR"))
 ):
     food_item = db.query(models.FoodItem).filter(models.FoodItem.id == food_id).first()
 
     if not food_item:
-        return HTTPException(
+        raise HTTPException(
             status_code=404,
             detail="Food item not found"
         )
@@ -70,7 +73,7 @@ def delete_food(
     food_item = db.query(models.FoodItem).filter(models.FoodItem.id == food_id).first()
 
     if not food_item:
-        return HTTPException(
+        raise HTTPException(
             status_code=404,
             detail="Food item not found"
         )
