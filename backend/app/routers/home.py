@@ -8,7 +8,8 @@ router = APIRouter(tags=["Home"])
 @router.get("/vendors")
 def get_home_vendors(db: Session = Depends(get_db)):
     vendors = db.query(models.User).filter(
-        models.User.role == "VENDOR"
+        models.User.role == "VENDOR",
+        models.User.shop_name != None
     ).all()
 
     result = []
