@@ -35,6 +35,9 @@ def update_vendor_profile(
     db: Session = Depends(get_db),
     vendor = Depends(require_role("VENDOR"))
 ):
+    if not opening_hour or not closing_hour:
+        raise HTTPException(400, "Opening & closing time required")
+
     for key, value in data.dict(exclude_unset=True).items():
         setattr(vendor, key, value)
 
