@@ -126,8 +126,8 @@ def get_vendor_menu(
     return {
         "vendor": {
             "id": vendor.id,
-            "name": vendor.name,
-            "description": vendor.description
+            "name": vendor.shop_name or vendor.name,
+            "description": vendor.category or "Food"
         },
         "menu": menu_items
     }

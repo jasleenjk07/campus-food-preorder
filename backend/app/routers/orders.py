@@ -1,5 +1,7 @@
 import random
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, Header
 
 from sqlalchemy.orm import Session, joinedload #Session represents a database connection
@@ -356,25 +358,45 @@ def checkout(
     if not vendor:
         raise HTTPException(status_code=404, detail="Vendor not found")
 
-    # Validate pickup time
-    available_slots = pickup_service.generate_pickup_slots(
-        opening_hour=vendor.opening_hour,
-        closing_hour=vendor.closing_hour
-    )
-
-    if request.pickup_time not in available_slots:
+    if vendor.opening_hour is None or vendor.closing_hour is None:
         raise HTTPException(
             status_code=400,
-            detail="Invalid or expired pickup time"
+            detail="Vendor is not configured yet"
         )
+
+    # Validate pickup time
+    try:
+        available_slots = pickup_service.generate_pickup_slots(
+            opening_hour=vendor.opening_hour,
+            closing_hour=vendor.closing_hour
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        parsed_time = datetime.strptime(request.pickup_time, "%I:%M %p")
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid time format (use HH:MM AM/PM)"
+        )
+
+    # Allow custom time if slots are empty (vendor closed) TEMPORARY FOR CHECKING THE FRONTEND
+    # if available_slots:
+    #     if request.pickup_time not in available_slots:
+    #         raise HTTPException(
+    #             status_code=400,
+    #             detail="Selected time is not available"
+    #         )
 
     # Create Order
     order = models.Order(
         user_id=current_user.id,
         status="PLACED",
         total_price=0,
-        pickup_time=request.pickup_time
+        pickup_time=parsed_time
     )
+    
     db.add(order)
     db.flush()
 
@@ -494,9 +516,13 @@ def get_payment_summary(
     if not order:
         raise HTTPException(status_code=400, detail="No pending order found")
 
+    order_items = db.query(models.OrderItem).filter(
+        models.OrderItem.order_id == order.id
+    ).all()
+
     items = []
 
-    for item in order.items:
+    for item in order_items:
         food = db.query(models.FoodItem).filter(
             models.FoodItem.id == item.food_id
         ).first()
@@ -507,7 +533,7 @@ def get_payment_summary(
             "price": item.price_at_time * item.quantity
         })
 
-    item_total = order.total_price
+    item_total = sum(item.price_at_time * item.quantity for item in order_items)
     service_fee = 10.0
     final_total = item_total + service_fee
 
@@ -516,11 +542,33 @@ def get_payment_summary(
         "item_total": item_total,
         "service_fee": service_fee,
         "final_total": final_total,
-        "item_count": len(order.items),
+        "item_count": sum(item.quantity for item in order_items), 
         "wallet_balance": current_user.wallet_balance,
         "wallet_enabled": True,
         "upi_enabled": True,
         "card_enabled": True
+    }
+
+@router.get("/{order_id}/confirmation")
+def get_order_confirmation(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role("USER"))
+):
+    order = db.query(models.Order).filter(
+        models.Order.id == order_id,
+        models.Order.user_id == current_user.id
+    ).first()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    return {
+        "order_id": f"ORD-2026-{order.id:06d}",
+        "pickup_time": order.pickup_time.strftime("%I:%M %p") if order.pickup_time else "N/A",
+        "pickup_location": "Campus Cafe",
+        "counter": "Counter #3",
+        "preparation_time": "15-20 minutes"
     }
 
 @router.post("/confirm-payment")
@@ -541,7 +589,7 @@ def confirm_payment(
     service_fee = 10.0
     final_total = item_total + service_fee
     
-    if data.payment_method == "wallet":
+    if data.payment_method == PaymentMethod.WALLET:
         if current_user.wallet_balance < final_total:
             raise HTTPException(status_code=400, detail="Insufficient wallet balance")
         
@@ -553,7 +601,7 @@ def confirm_payment(
     db.commit()
 
     return {
-        "message": "Payment successful"
+        "order_id": order.id
     }
 
 @router.get("/history", response_model=list[OrderHistoryResponse])
@@ -601,3 +649,77 @@ async def get_order_history(
         })
 
     return order_history
+
+@router.get("/{order_id}/track")
+def track_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role("USER", "VENDOR", "ADMIN"))
+):
+    order = db.query(models.Order).filter(
+        models.Order.id == order_id
+    ).first()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if current_user.role == "USER" and order.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not your order")
+
+    if current_user.role == "VENDOR":
+        vendor_order = (
+            db.query(models.Order)
+            .join(models.OrderItem)
+            .join(models.FoodItem)
+            .filter(
+                models.Order.id == order_id,
+                models.FoodItem.vendor_id == current_user.id
+            )
+            .first()
+        )
+
+        if not vendor_order:
+            raise HTTPException(status_code=403, detail="Not your order")
+
+    return {
+    "order_id": f"ORD-2026-{order.id:06d}",
+    "status": order.status,
+    "token": order.id + 100000,  
+    "total": order.total_price,
+
+    "items": [
+        {
+            "name": item.food.name,
+            "quantity": item.quantity,
+            "price": item.price_at_time
+        }
+        for item in order.items
+    ],
+
+    "timeline": [
+        {
+            "title": "Order Placed",
+            "time": str(order.created_at.strftime("%I:%M %p")),
+            "is_completed": True,
+            "is_current": order.status == "PLACED"
+        },
+        {
+            "title": "Preparing",
+            "time": "",
+            "is_completed": order.status in ["PREPARING", "READY", "DELIVERED"],
+            "is_current": order.status == "PREPARING"
+        },
+        {
+            "title": "Ready for Pickup",
+            "time": "",
+            "is_completed": order.status in ["READY", "DELIVERED"],
+            "is_current": order.status == "READY"
+        },
+        {
+            "title": "Completed",
+            "time": "",
+            "is_completed": order.status == "DELIVERED",
+            "is_current": order.status == "DELIVERED"
+        }
+    ]
+}
