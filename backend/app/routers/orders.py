@@ -682,9 +682,44 @@ def track_order(
             raise HTTPException(status_code=403, detail="Not your order")
 
     return {
-        "order_id": order.id,
-        "status": order.status,
-        "is_paid": order.is_paid,
-        "pickup_time": order.pickup_time,
-        "created_at": order.created_at
-    }   
+    "order_id": f"ORD-2026-{order.id:06d}",
+    "status": order.status,
+    "token": order.id + 100000,  
+    "total": order.total_price,
+
+    "items": [
+        {
+            "name": item.food.name,
+            "quantity": item.quantity,
+            "price": item.price_at_time
+        }
+        for item in order.items
+    ],
+
+    "timeline": [
+        {
+            "title": "Order Placed",
+            "time": str(order.created_at.strftime("%I:%M %p")),
+            "is_completed": True,
+            "is_current": order.status == "PLACED"
+        },
+        {
+            "title": "Preparing",
+            "time": "",
+            "is_completed": order.status in ["PREPARING", "READY", "DELIVERED"],
+            "is_current": order.status == "PREPARING"
+        },
+        {
+            "title": "Ready for Pickup",
+            "time": "",
+            "is_completed": order.status in ["READY", "DELIVERED"],
+            "is_current": order.status == "READY"
+        },
+        {
+            "title": "Completed",
+            "time": "",
+            "is_completed": order.status == "DELIVERED",
+            "is_current": order.status == "DELIVERED"
+        }
+    ]
+}
