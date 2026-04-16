@@ -7,6 +7,9 @@ def generate_pickup_slots(opening_hour: int, closing_hour: int):
     now = datetime.now()
     today = now.date()
 
+    if opening_hour is None or closing_hour is None:
+        raise ValueError("Vendor timings not configured")
+        
     opening_time = datetime.combine(today, time(opening_hour, 0))
     closing_time = datetime.combine(today, time(closing_hour, 0))
 
