@@ -182,11 +182,10 @@ def vendor_menu(
     db: Session = Depends(get_db),
     vendor = Depends(require_role("VENDOR"))
 ):
-    menu = (
-        db.query(models.FoodItem)
-        .filter(models.FoodItem.vendor_id == vendor.id)
-        .all()
-    )
+    menu = db.query(models.FoodItem).filter(
+        models.FoodItem.vendor_id == vendor.id
+    ).all()
+    
     return menu
 
 @router.get("/low-stock")
