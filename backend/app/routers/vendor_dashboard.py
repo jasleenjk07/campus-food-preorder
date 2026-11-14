@@ -57,21 +57,24 @@ def vendor_dashboard(
             prep = (o.pickup_time - o.created_at).total_seconds() / 60
             prep_times.append(prep)
 
-    avg_prep_time = round(sum(prep_times)/len(prep_times), 2) if prep_times else 0
+    # Android expects an Int for avg_prep_time (not float)
+    avg_prep_time = int(round(sum(prep_times) / len(prep_times))) if prep_times else 0
 
     today_revenue = sum(
         o.total_price for o in today_orders if o.is_paid
     )
 
     return {
-        "vendor_name": vendor.name,
+        "vendor_name": vendor.shop_name or vendor.name,
         "today_orders": len(today_orders),
         "pending_orders": len(pending),
         "preparing_orders": len(preparing),
+        # Android model uses delivered_orders (not completed_orders)
+        "delivered_orders": len(delivered),
         "completed_orders": len(delivered),
         "today_revenue": today_revenue,
         "avg_prep_time": avg_prep_time,
-        "recent_orders": formatted_recent_orders
+        "recent_orders": formatted_recent_orders,
     }
 
 @router.get("/orders/today")
