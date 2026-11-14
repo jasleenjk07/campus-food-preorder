@@ -1,66 +1,85 @@
-from passlib.context import CryptContext #Manages password hashing algorithms
+import json
+import logging
 
-from sqlalchemy import func
+import redis
+from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app import models
-from app.core.redis_ws import manager
-from app.tasks.notifications import send_notification_task, send_email_notification
+from app.config import settings
 
-import asyncio
+logger = logging.getLogger(__name__)
 
 pwd_context = CryptContext(
-    schemes=["bcrypt_sha256"], #This avoids the low-level bcrypt issues and is recommended by Passlib.
-    deprecated="auto" #If a hashing algorithm becomes weak in the future, mark it as deprecated automatically.
+    schemes=["bcrypt_sha256"],
+    deprecated="auto",
 )
 
-def hash_password(password: str) -> str: #It takes a plain password and return a secure hashed password.
+
+def hash_password(password: str) -> str:
     return pwd_context.hash(password)
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
-async def create_notification( #Creates and saves a notification in the database for a specific user.
-    db: Session,
-    user_id: int,
-    message: str
-):
-    # Check user preference
+
+def _get_redis_client():
+    return redis.Redis.from_url(
+        settings.REDIS_URL,
+        socket_connect_timeout=1,
+        socket_timeout=1,
+    )
+
+
+def publish_realtime(user_id: int, message: str) -> bool:
+    try:
+        client = _get_redis_client()
+        payload = {
+            "type": "notification",
+            "user_id": user_id,
+            "message": message,
+        }
+        client.publish("notifications", json.dumps(payload))
+        client.close()
+        return True
+    except Exception as exc:
+        logger.warning("Realtime publish failed: %s", exc)
+        return False
+
+
+def create_notification(db: Session, user_id: int, message: str):
+    """Persist an in-app notification and best-effort push it.
+
+    Email is only enqueued when Redis (Celery broker) is reachable, so
+    order/payment APIs never stall on broker outages.
+    """
     preference = db.query(models.NotificationPreference).filter(
         models.NotificationPreference.user_id == user_id
     ).first()
 
-    # If preferences exist and notifications disabled → stop
     if preference and not preference.order_enabled:
         return
 
-    # Create notification in DB
     notification = models.Notification(
         user_id=user_id,
         message=message,
-        is_read=False
+        is_read=False,
     )
-
     db.add(notification)
     db.commit()
 
-    # Recalculate unread count
-    unread_count = db.query(func.count(models.Notification.id)).filter(
-        models.Notification.user_id == user_id,
-        models.Notification.is_read == False
-    ).scalar()
+    redis_ok = publish_realtime(user_id, message)
+    if not redis_ok:
+        return
 
-    # Publish to Redis
-    await manager.publish(
-        user_id,
-        {
-            "type": "unread_count_update",
-            "unread_count": unread_count
-        }
-    )
+    try:
+        from app.tasks.notifications import send_email_notification
 
-    send_email_notification.delay(
-        user_id,
-        "Cravix Notification",
-        message
-    )
+        send_email_notification.apply_async(
+            args=(user_id, "Cravix Notification", message),
+            ignore_result=True,
+            retry=False,
+        )
+    except Exception as exc:
+        logger.warning("Email notification enqueue failed: %s", exc)

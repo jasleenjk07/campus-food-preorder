@@ -1,25 +1,52 @@
-import redis #Python client to connect to your Redis server.
 import json
+import logging
 
-redis_client = redis.Redis(host="redis", port=6379, db=1) #Connect to Redis running on: Host: localhost, Port: 6379, Database: 1
+import redis
 
-CACHE_TTL = 300 #5 minutes: how long cached data lives. After 5 minutes: Redis automatically deletes the cached value.
+from app.config import settings
 
-#Retrieve the value from Redis.
+logger = logging.getLogger(__name__)
+
+redis_client = None
+try:
+    redis_client = redis.Redis.from_url(
+        settings.REDIS_URL,
+        decode_responses=False,
+        socket_connect_timeout=1,
+        socket_timeout=1,
+    )
+except Exception as exc:
+    logger.warning("Redis cache client init failed: %s", exc)
+    redis_client = None
+
+CACHE_TTL = 300  # 5 minutes
+
+
 def get_cache(key: str):
-    data = redis_client.get(key)
-    if data:
-        return json.loads(data)
+    if redis_client is None:
+        return None
+    try:
+        data = redis_client.get(key)
+        if data:
+            return json.loads(data)
+    except Exception as exc:
+        logger.warning("Cache get failed for %s: %s", key, exc)
     return None
 
-#Store the value in Redis with a TTL.
-def set_cache(key: str, value):
-    redis_client.setex( #setex = set with expiration (Set value + Expiry time)
-        key,
-        CACHE_TTL,
-        json.dumps(value)
-    )
 
-#Delete the value from Redis.
+def set_cache(key: str, value):
+    if redis_client is None:
+        return
+    try:
+        redis_client.setex(key, CACHE_TTL, json.dumps(value))
+    except Exception as exc:
+        logger.warning("Cache set failed for %s: %s", key, exc)
+
+
 def delete_cache(key: str):
-    redis_client.delete(key)
+    if redis_client is None:
+        return
+    try:
+        redis_client.delete(key)
+    except Exception as exc:
+        logger.warning("Cache delete failed for %s: %s", key, exc)

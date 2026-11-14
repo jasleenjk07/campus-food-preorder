@@ -16,15 +16,26 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # Email Configuration
-    EMAIL_HOST: str = "smtp@gmail.com" #which SMTP server to use, Gmail’s mail server
-    EMAIL_PORT: int = 587 #which port to connect to, Port 587 = TLS secure email port
-    EMAIL_USER: str #login email
-    EMAIL_PASSWORD: str #login password
-    EMAIL_FROM: str #sender name shown in email
+    EMAIL_HOST: str = "smtp.gmail.com"
+    EMAIL_PORT: int = 587
+    EMAIL_USER: str = ""
+    EMAIL_PASSWORD: str = ""
+    EMAIL_FROM: str = "Cravix <noreply@cravix.com>"
+    PUBLIC_BASE_URL: str = "http://10.0.2.2:8000"
+    # Comma-separated origins for browsers, or "*" (Android native apps ignore CORS)
+    CORS_ORIGINS: str = "*"
 
-    #This allows you to validate specific fields.
+    @field_validator("DATABASE_URL")
+    def normalize_database_url(cls, v: str) -> str:
+        # Some hosts provide postgres:// — SQLAlchemy + psycopg2 need postgresql://
+        if v.startswith("postgres://"):
+            v = v.replace("postgres://", "postgresql+psycopg2://", 1)
+        elif v.startswith("postgresql://") and "+psycopg2" not in v:
+            v = v.replace("postgresql://", "postgresql+psycopg2://", 1)
+        return v
+
     @field_validator("SECRET_KEY")
-    def validate_secret_key(cls, v, info): #v = the actual SECRET_KEY value from .env, values = other already loaded environment variables
+    def validate_secret_key(cls, v, info):
         env = info.data.get("ENVIRONMENT")
         if env == "production" and len(v) < 32:
             raise ValueError("SECRET_KEY too weak for production")

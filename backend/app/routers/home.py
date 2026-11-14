@@ -1,27 +1,29 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+
 from app.database import get_db
 from app import models
 
 router = APIRouter(tags=["Home"])
 
+
 @router.get("/vendors")
 def get_home_vendors(db: Session = Depends(get_db)):
     vendors = db.query(models.User).filter(
-        models.User.role == "VENDOR",
-        models.User.shop_name != None
+        models.User.role == "VENDOR"
     ).all()
 
     result = []
-
     for vendor in vendors:
         result.append({
             "id": vendor.id,
-            "name": vendor.shop_name or vendor.name,  
-            "category": vendor.category or "Food",     
-            "image_url": vendor.logo_url or "",       
+            "name": vendor.shop_name or vendor.name,
+            "category": vendor.category or "Food",
+            "image_url": vendor.logo_url or "",
             "is_open": vendor.is_open if vendor.is_open is not None else True,
-            "delivery_time": "10-15 min"
+            "opening_hour": vendor.opening_hour,
+            "closing_hour": vendor.closing_hour,
+            "delivery_time": "10-15 min",
         })
 
     return result

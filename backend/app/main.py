@@ -1,9 +1,10 @@
-import logging #Python’s built-in logging module. Logging means: Recording what your application is doing while it is running.
+import logging
+import os
 import asyncio
 import redis.asyncio as redis
 
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse #Custom error response
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -42,17 +43,21 @@ app = FastAPI(title="Cravix API") #Creates FastAPI application object
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
 
-if settings.ENVIRONMENT == "production":
-    origins = ["https://cravix.com"]
+# CORS: Android native apps do not need this; useful for web / admin panels.
+_raw_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+if _raw_origins == ["*"]:
+    origins = ["*"]
+    allow_credentials = False  # browsers reject credentials + wildcard
 else:
-    origins = ["*"] #Allow all origins.
+    origins = _raw_origins
+    allow_credentials = True
 
 app.add_middleware(
-    CORSMiddleware, #CORS = Cross-Origin Resource Sharing, It controls which frontend domains are allowed to call your backend API.
-    allow_origins=origins, #Defines who can call your backend
-    allow_credentials=True, #Allows cookies, authentication tokens, etc. to be sent with the request.
-    allow_methods=["*"], #Allows all HTTP methods (GET, POST, PUT, DELETE, etc.)
-    allow_headers=["*"], #Allows all headers (Authorization, Content-Type, etc.)
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=allow_credentials,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware): #Middleware = a layer that runs before and/or after every request.
@@ -92,7 +97,8 @@ app.include_router(vendor_dashboard.router, prefix=f"{API_V1_PREFIX}/vendor")
 app.include_router(vendor_profile.router, prefix=f"{API_V1_PREFIX}/vendor")
 app.include_router(home.router, prefix=f"{API_V1_PREFIX}/home")
 
-app.mount("/uploads", StaticFiles(directory="Uploads"), name="uploads")
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 #A simple test API 
 @app.get("/")
@@ -155,8 +161,14 @@ async def rate_limit_handler(request, exc):
 
 @app.on_event("startup")
 async def startup_event():
-    models.Base.metadata.create_all(bind=engine)
-    asyncio.create_task(manager.start_listener())
+    try:
+        models.Base.metadata.create_all(bind=engine)
+    except Exception as exc:
+        logger.error("Database init failed on startup: %s", exc)
+    try:
+        asyncio.create_task(manager.start_listener())
+    except Exception as exc:
+        logger.error("Redis websocket listener failed on startup: %s", exc)
 
 #Health check endpoint: It just confirms app is alive, the server is running, and Redis is connected. App process alive
 @app.get("/health/live") 
@@ -186,7 +198,7 @@ async def readiness_check():
         await r.ping()
         redis_status = "connected"
     except Exception as e:
-        print("Redis error:", e)
+        logger.warning("Redis readiness check failed: %s", e)
 
     status = "ready" if db_status == "connected" and redis_status == "connected" else "not_ready"
     
