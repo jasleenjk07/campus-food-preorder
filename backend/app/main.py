@@ -1,9 +1,10 @@
-import logging #Python’s built-in logging module. Logging means: Recording what your application is doing while it is running.
+import logging
+import os
 import asyncio
 import redis.asyncio as redis
 
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse #Custom error response
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -92,7 +93,8 @@ app.include_router(vendor_dashboard.router, prefix=f"{API_V1_PREFIX}/vendor")
 app.include_router(vendor_profile.router, prefix=f"{API_V1_PREFIX}/vendor")
 app.include_router(home.router, prefix=f"{API_V1_PREFIX}/home")
 
-app.mount("/uploads", StaticFiles(directory="Uploads"), name="uploads")
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 #A simple test API 
 @app.get("/")
@@ -155,8 +157,14 @@ async def rate_limit_handler(request, exc):
 
 @app.on_event("startup")
 async def startup_event():
-    models.Base.metadata.create_all(bind=engine)
-    asyncio.create_task(manager.start_listener())
+    try:
+        models.Base.metadata.create_all(bind=engine)
+    except Exception as exc:
+        logger.error("Database init failed on startup: %s", exc)
+    try:
+        asyncio.create_task(manager.start_listener())
+    except Exception as exc:
+        logger.error("Redis websocket listener failed on startup: %s", exc)
 
 #Health check endpoint: It just confirms app is alive, the server is running, and Redis is connected. App process alive
 @app.get("/health/live") 

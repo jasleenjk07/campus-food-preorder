@@ -6,32 +6,61 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app import models
-from app.schemas import UserCreate, UserPrivate, VendorPrivate
-from app.utils import hash_password
-from app.utils import verify_password
+from app.utils import hash_password, verify_password
 from app.auth.jwt import create_access_token
-from app.schemas import LoginResponse, UserPrivate, VendorPrivate, UserCreate
+from app.schemas import (
+    LoginResponse,
+    LoginRequest,
+    UserPrivate,
+    VendorPrivate,
+    UserCreate,
+    UserRole,
+)
 from app.auth.roles import require_role
 from app.core.rate_limiter import limiter
 
 router = APIRouter(tags=["Auth"])
 
+
+def _normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+
+def _build_login_response(user: models.User) -> LoginResponse:
+    token = create_access_token({"user_id": user.id, "role": user.role})
+    if user.role == "VENDOR":
+        user_data = VendorPrivate.model_validate(user)
+    else:
+        user_data = UserPrivate.model_validate(user)
+    return LoginResponse(
+        access_token=token,
+        token_type="bearer",
+        user=user_data,
+    )
+
+
 @router.post("/register", response_model=Union[UserPrivate, VendorPrivate])
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
-    #Check if user already exists
+    email = _normalize_email(user.email)
+
+    if user.role == UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot self-register as ADMIN",
+        )
+
     existing_user = db.query(models.User).filter(
-        models.User.email == user.email
+        models.User.email == email
     ).first()
 
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    #Create new user
     new_user = models.User(
-        name=user.name,
-        email=user.email,
+        name=user.name.strip(),
+        email=email,
         password_hash=hash_password(user.password),
-        role=user.role,
+        role=user.role.value,
         university_id=user.university_id,
     )
 
@@ -40,21 +69,30 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
 
     if new_user.role == "VENDOR":
-        return VendorPrivate.from_orm(new_user)
-    return UserPrivate.from_orm(new_user)
+        return VendorPrivate.model_validate(new_user)
+    return UserPrivate.model_validate(new_user)
+
 
 @router.post("/create-user", response_model=Union[UserPrivate, VendorPrivate])
 def create_user_by_admin(
     user: UserCreate,
     db: Session = Depends(get_db),
-    admin = Depends(require_role("ADMIN"))
+    admin=Depends(require_role("ADMIN")),
 ):
+    email = _normalize_email(user.email)
+
+    existing_user = db.query(models.User).filter(
+        models.User.email == email
+    ).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
     new_user = models.User(
-        name=user.name,
-        email=user.email,
+        name=user.name.strip(),
+        email=email,
         password_hash=hash_password(user.password),
-        role=user.role, #ADMIN can assign
-        university_id=user.university_id
+        role=user.role.value,
+        university_id=user.university_id,
     )
 
     db.add(new_user)
@@ -62,32 +100,39 @@ def create_user_by_admin(
     db.refresh(new_user)
 
     if new_user.role == "VENDOR":
-        return VendorPrivate.from_orm(new_user)
-    return UserPrivate.from_orm(new_user)
-    
+        return VendorPrivate.model_validate(new_user)
+    return UserPrivate.model_validate(new_user)
+
+
 @router.post("/login", response_model=LoginResponse)
-@limiter.limit("5/minute")
+@limiter.limit("20/minute")
 def login_user(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    user = db.query(models.User).filter(
-        models.User.email == form_data.username
-    ).first()
+    """OAuth2 form login (Swagger / form clients). username = email."""
+    email = _normalize_email(form_data.username)
+    user = db.query(models.User).filter(models.User.email == email).first()
 
     if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    token = create_access_token({"user_id": user.id, "role": user.role})
+    return _build_login_response(user)
 
-    if user.role == "VENDOR":
-        user_data = VendorPrivate.from_orm(user)
-    else:
-        user_data = UserPrivate.from_orm(user)
 
-    return LoginResponse(
-        access_token=token,
-        token_type="bearer",
-        user=user_data
-    )
+@router.post("/login/json", response_model=LoginResponse)
+@limiter.limit("20/minute")
+def login_user_json(
+    request: Request,
+    credentials: LoginRequest,
+    db: Session = Depends(get_db),
+):
+    """JSON login for Android / mobile clients."""
+    email = _normalize_email(credentials.email)
+    user = db.query(models.User).filter(models.User.email == email).first()
+
+    if not user or not verify_password(credentials.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    return _build_login_response(user)

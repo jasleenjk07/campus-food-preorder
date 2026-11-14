@@ -13,7 +13,7 @@ def send_email(to_email: str, subject: str, body: str):
 
     msg.attach(MIMEText(body, "plain")) #"plain" → means plain text email
 
-    with smtplib.SMTP(settings.EMAIL_HOST, settings.EMAIL_PORT) as server: #This opens a connection to your email server
-        server.starttls() #TLS = Transport Layer Security, Encrypts your connection 
-        server.login(settings.EMAIL_USER, settings.EMAIL_PASSWORD) #Authenticates with the email serve
-        server.send_message(msg) #Sends the email
+    with smtplib.SMTP(settings.EMAIL_HOST, settings.EMAIL_PORT, timeout=10) as server:
+        server.starttls()
+        server.login(settings.EMAIL_USER, settings.EMAIL_PASSWORD)
+        server.send_message(msg)

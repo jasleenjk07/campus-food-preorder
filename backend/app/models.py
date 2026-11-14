@@ -45,7 +45,7 @@ class FoodItem(Base):
     image_url = Column(String, nullable=True)
     
     is_available = Column(Boolean, default=True, index=True)
-    stock=Column(Integer, default=0)
+    stock = Column(Integer, default=100)
 
     vendor_id = Column(Integer, ForeignKey("users.id"), index=True)
     vendor = relationship("User", backref="food_items")

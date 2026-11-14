@@ -25,13 +25,39 @@ def vendor_dashboard(
         .all()
     )
 
-    today_orders = [
-        o for o in orders if o.created_at.date() == today
-    ]
-
+    today_orders = [o for o in orders if o.created_at.date() == today]
     pending = [o for o in orders if o.status == "PLACED"]
     preparing = [o for o in orders if o.status == "PREPARING"]
     delivered = [o for o in orders if o.status == "DELIVERED"]
+
+    recent_orders = sorted(
+        orders,
+        key=lambda x: x.created_at,
+        reverse=True
+    )[:5]
+
+    formatted_recent_orders = []
+    for o in recent_orders:
+        customer = db.query(models.User).filter(models.User.id == o.user_id).first()
+
+        items_count = sum(item.quantity for item in o.items)
+
+        formatted_recent_orders.append({
+            "order_id": o.id,
+            "customer_name": customer.name if customer else "Customer",
+            "items_count": items_count,
+            "total_price": o.total_price,
+            "status": o.status,
+            "time_ago": "Just now" 
+        })
+
+    prep_times = []
+    for o in delivered:
+        if o.pickup_time:
+            prep = (o.pickup_time - o.created_at).total_seconds() / 60
+            prep_times.append(prep)
+
+    avg_prep_time = round(sum(prep_times)/len(prep_times), 2) if prep_times else 0
 
     today_revenue = sum(
         o.total_price for o in today_orders if o.is_paid
@@ -42,8 +68,10 @@ def vendor_dashboard(
         "today_orders": len(today_orders),
         "pending_orders": len(pending),
         "preparing_orders": len(preparing),
-        "delivered_orders": len(delivered),
-        "today_revenue": today_revenue
+        "completed_orders": len(delivered),
+        "today_revenue": today_revenue,
+        "avg_prep_time": avg_prep_time,
+        "recent_orders": formatted_recent_orders
     }
 
 @router.get("/orders/today")

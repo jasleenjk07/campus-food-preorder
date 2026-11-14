@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, EmailStr #Pyndatic is used to validate the incoming data, automatically reject bad requests and convert data to python objects
+from pydantic import BaseModel, EmailStr, Field
 from enum import Enum
 from typing import List, Union, Optional
 
@@ -13,7 +13,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     university_id: int | None = None
-    role: UserRole
+    role: UserRole = UserRole.USER
     
 class UserBase(BaseModel):
     id: int
@@ -66,10 +66,11 @@ class LoginResponse(BaseModel):
 class FoodCreate(BaseModel): #Rules for food data coming INTO the backend (What client sends)
     name: str
     description: str | None = None
-    price: float
+    price: float = Field(..., gt=0)
     category: str | None = None
     image_url: str | None = None
     is_available: bool = True
+    stock: int = Field(default=100, ge=0)
 
 class FoodResponse(BaseModel): #Clean, safe data sent OUT to frontend (What client receives)
     id: int
@@ -79,6 +80,8 @@ class FoodResponse(BaseModel): #Clean, safe data sent OUT to frontend (What clie
     category: str | None
     image_url: str | None
     is_available: bool
+    stock: int = 0
+    vendor_id: int | None = None
 
     class Config: #How data is stored
         from_attributes = True
@@ -87,11 +90,14 @@ class FoodUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     price: Optional[float] = None
+    category: Optional[str] = None
+    image_url: Optional[str] = None
     is_available: Optional[bool] = None
+    stock: Optional[int] = None
 
 class OrderCreate(BaseModel): #This defines what data the client must send when placing an order.
     food_id: int
-    quantity: int = 1
+    quantity: int = Field(default=1, ge=1)
 
 class OrderItemResponse(BaseModel):
     food_id: int
@@ -124,7 +130,7 @@ class OrderHistoryResponse(BaseModel):
     total_items: int
     total_price: float
     status: str
-    pickup_time: datetime
+    pickup_time: datetime | None = None
     is_paid: bool
     payment_method: str | None
     created_at: datetime
@@ -136,11 +142,11 @@ class OrderHistoryResponse(BaseModel):
 
 class CartAddRequest(BaseModel):
     food_id: int
-    quantity: int = 1
+    quantity: int = Field(default=1, ge=1)
 
 class CartUpdateRequest(BaseModel):
     food_id: int
-    quantity: int
+    quantity: int = Field(..., ge=1)
 
 class CartItemResponse(BaseModel):
     food_id: int
@@ -177,7 +183,8 @@ class PaymentSummaryResponse(BaseModel):
     card_enabled: bool
 
 class ConfirmPaymentRequest(BaseModel):
-    payment_method: PaymentMethod | None
+    payment_method: PaymentMethod = PaymentMethod.UPI_INAPP
+    order_id: int | None = None
 
 class NotificationResponse(BaseModel):
     id: int
@@ -218,10 +225,13 @@ class VendorProfileResponse(BaseModel):
         from_attributes = True
 
 class VendorProfileUpdate(BaseModel):
-    phone: str 
-    shop_name: str 
-    address: str 
+    phone: Optional[str] = None
+    shop_name: Optional[str] = None
+    address: Optional[str] = None
     logo_url: Optional[str] = None
+    category: Optional[str] = None
+    opening_hour: Optional[int] = None
+    closing_hour: Optional[int] = None
 
 class BankDetailsResponse(BaseModel):
     account_holder_name: str | None
