@@ -1,0 +1,16 @@
+venv
+.venv
+__pycache__
+*.pyc
+*.pyo
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+dump.rdb
+*.db
+uploads/*
+!uploads/.gitkeep
+.pytest_cache
+.mypy_cache

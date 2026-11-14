@@ -43,17 +43,21 @@ app = FastAPI(title="Cravix API") #Creates FastAPI application object
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
 
-if settings.ENVIRONMENT == "production":
-    origins = ["https://cravix.com"]
+# CORS: Android native apps do not need this; useful for web / admin panels.
+_raw_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+if _raw_origins == ["*"]:
+    origins = ["*"]
+    allow_credentials = False  # browsers reject credentials + wildcard
 else:
-    origins = ["*"] #Allow all origins.
+    origins = _raw_origins
+    allow_credentials = True
 
 app.add_middleware(
-    CORSMiddleware, #CORS = Cross-Origin Resource Sharing, It controls which frontend domains are allowed to call your backend API.
-    allow_origins=origins, #Defines who can call your backend
-    allow_credentials=True, #Allows cookies, authentication tokens, etc. to be sent with the request.
-    allow_methods=["*"], #Allows all HTTP methods (GET, POST, PUT, DELETE, etc.)
-    allow_headers=["*"], #Allows all headers (Authorization, Content-Type, etc.)
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=allow_credentials,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware): #Middleware = a layer that runs before and/or after every request.
@@ -194,7 +198,7 @@ async def readiness_check():
         await r.ping()
         redis_status = "connected"
     except Exception as e:
-        print("Redis error:", e)
+        logger.warning("Redis readiness check failed: %s", e)
 
     status = "ready" if db_status == "connected" and redis_status == "connected" else "not_ready"
     

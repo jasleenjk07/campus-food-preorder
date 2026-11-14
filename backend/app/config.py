@@ -22,8 +22,18 @@ class Settings(BaseSettings):
     EMAIL_PASSWORD: str = ""
     EMAIL_FROM: str = "Cravix <noreply@cravix.com>"
     PUBLIC_BASE_URL: str = "http://10.0.2.2:8000"
+    # Comma-separated origins for browsers, or "*" (Android native apps ignore CORS)
+    CORS_ORIGINS: str = "*"
 
-    #This allows you to validate specific fields.
+    @field_validator("DATABASE_URL")
+    def normalize_database_url(cls, v: str) -> str:
+        # Some hosts provide postgres:// — SQLAlchemy + psycopg2 need postgresql://
+        if v.startswith("postgres://"):
+            v = v.replace("postgres://", "postgresql+psycopg2://", 1)
+        elif v.startswith("postgresql://") and "+psycopg2" not in v:
+            v = v.replace("postgresql://", "postgresql+psycopg2://", 1)
+        return v
+
     @field_validator("SECRET_KEY")
     def validate_secret_key(cls, v, info):
         env = info.data.get("ENVIRONMENT")

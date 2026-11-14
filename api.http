@@ -3,7 +3,7 @@
 ### Replace {{token}} with your JWT after login; use different tokens for USER, VENDOR, ADMIN as needed
 
 @baseUrl = http://localhost:8000
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjo0LCJyb2xlIjoiVVNFUiIsImV4cCI6MTc3MDc0NTYzNX0.aea-0PtVoJGLpAaeeUH5EjSEVmchX_7tQfnboR3E7PA
+@token = REPLACE_WITH_JWT_AFTER_LOGIN
 
 ###############################################################################
 # Health Check
