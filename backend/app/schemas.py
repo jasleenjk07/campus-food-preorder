@@ -1,7 +1,36 @@
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from enum import Enum
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Any
+
+
+def _parse_hour(value: Any) -> Optional[int]:
+    """Accept 9, '9', '09:00', '9:00 AM' from Android shop-setup forms."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        raise ValueError("Invalid hour")
+    if isinstance(value, (int, float)):
+        hour = int(value)
+    else:
+        text = str(value).strip()
+        upper = text.upper()
+        try:
+            if "AM" in upper or "PM" in upper:
+                parsed = datetime.strptime(upper.replace(".", ""), "%I:%M %p")
+                hour = parsed.hour
+            elif ":" in text:
+                hour = int(text.split(":")[0])
+            else:
+                hour = int(float(text))
+        except Exception as exc:
+            raise ValueError(
+                "opening_hour/closing_hour must be 0-23 or a time like 09:00 / 9:00 AM"
+            ) from exc
+
+    if hour < 0 or hour > 23:
+        raise ValueError("Hour must be between 0 and 23")
+    return hour
 
 class UserRole(str, Enum):
     USER = "USER"
@@ -232,6 +261,16 @@ class VendorProfileUpdate(BaseModel):
     category: Optional[str] = None
     opening_hour: Optional[int] = None
     closing_hour: Optional[int] = None
+    # Aliases some Android screens send instead of opening_hour/closing_hour
+    opening_time: Optional[Any] = None
+    closing_time: Optional[Any] = None
+
+    model_config = {"extra": "ignore"}
+
+    @field_validator("opening_hour", "closing_hour", mode="before")
+    @classmethod
+    def coerce_hour(cls, v):
+        return _parse_hour(v)
 
 class BankDetailsResponse(BaseModel):
     account_holder_name: str | None

@@ -13,6 +13,7 @@ from app.schemas import (
     VendorProfileUpdate,
     BankDetailsResponse,
     BankDetailsUpdate,
+    _parse_hour,
 )
 from app.auth.roles import require_role
 from app.config import settings
@@ -23,16 +24,12 @@ UPLOAD_DIR = "uploads"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
 
-@router.get("/profile", response_model=VendorProfileResponse)
-def get_vendor_profile(
-    db: Session = Depends(get_db),
-    vendor=Depends(require_role("VENDOR")),
-):
+def _profile_payload(vendor) -> dict:
     return {
         "name": vendor.name,
-        "shop_name": vendor.shop_name,
         "email": vendor.email,
         "phone": vendor.phone,
+        "shop_name": vendor.shop_name,
         "address": vendor.address,
         "logo_url": vendor.logo_url,
         "is_open": vendor.is_open if vendor.is_open is not None else True,
@@ -41,13 +38,42 @@ def get_vendor_profile(
     }
 
 
-@router.put("/profile")
+@router.get("/profile", response_model=VendorProfileResponse)
+def get_vendor_profile(
+    db: Session = Depends(get_db),
+    vendor=Depends(require_role("VENDOR")),
+):
+    return _profile_payload(vendor)
+
+
+@router.put("/profile", response_model=VendorProfileResponse)
 def update_vendor_profile(
     data: VendorProfileUpdate,
     db: Session = Depends(get_db),
     vendor=Depends(require_role("VENDOR")),
 ):
     updates = data.model_dump(exclude_unset=True)
+
+    # Map Android aliases opening_time / closing_time → hour ints
+    if "opening_hour" not in updates and data.opening_time is not None:
+        try:
+            updates["opening_hour"] = _parse_hour(data.opening_time)
+        except Exception:
+            raise HTTPException(
+                status_code=422,
+                detail="Invalid opening_time. Use 0-23 or HH:MM / 9:00 AM",
+            )
+    if "closing_hour" not in updates and data.closing_time is not None:
+        try:
+            updates["closing_hour"] = _parse_hour(data.closing_time)
+        except Exception:
+            raise HTTPException(
+                status_code=422,
+                detail="Invalid closing_time. Use 0-23 or HH:MM / 9:00 AM",
+            )
+
+    updates.pop("opening_time", None)
+    updates.pop("closing_time", None)
 
     opening_hour = updates.get("opening_hour", vendor.opening_hour)
     closing_hour = updates.get("closing_hour", vendor.closing_hour)
@@ -59,18 +85,22 @@ def update_vendor_profile(
                 detail="Closing hour must be greater than opening hour",
             )
 
+    allowed = {
+        "phone",
+        "shop_name",
+        "address",
+        "logo_url",
+        "category",
+        "opening_hour",
+        "closing_hour",
+    }
     for key, value in updates.items():
-        setattr(vendor, key, value)
+        if key in allowed:
+            setattr(vendor, key, value)
 
     db.commit()
     db.refresh(vendor)
-
-    return {
-        "message": "Profile updated successfully",
-        "shop_name": vendor.shop_name,
-        "opening_hour": vendor.opening_hour,
-        "closing_hour": vendor.closing_hour,
-    }
+    return _profile_payload(vendor)
 
 
 @router.get("/hours")
